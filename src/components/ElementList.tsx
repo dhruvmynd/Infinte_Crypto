@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, X, ChevronRight } from 'lucide-react';
+import { Search, X, ChevronRight, LogOut } from 'lucide-react';
 import { DraggableItem } from '../types';
 
 interface ElementListProps {
@@ -9,6 +9,8 @@ interface ElementListProps {
   onDragStart: (e: React.DragEvent, item: DraggableItem) => void;
   deleteMode: boolean;
   onDelete: (itemId: string) => void;
+  userEmail?: string | null;
+  onSignOut?: () => void;
 }
 
 export function ElementList({ 
@@ -17,7 +19,9 @@ export function ElementList({
   onSearchChange, 
   onDragStart,
   deleteMode,
-  onDelete
+  onDelete,
+  userEmail,
+  onSignOut
 }: ElementListProps) {
   const [selectedElement, setSelectedElement] = useState<DraggableItem | null>(null);
 
@@ -164,6 +168,24 @@ export function ElementList({
           </p>
         )}
       </div>
+
+      {/* User Profile Section */}
+      {userEmail && onSignOut && (
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-[200px]">
+              {userEmail}
+            </span>
+            <button
+              onClick={onSignOut}
+              className="p-2 bg-gray-800/80 hover:bg-gray-700 rounded-full transition-colors"
+              title="Sign out"
+            >
+              <LogOut size={16} className="text-white" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
