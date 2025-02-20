@@ -21,9 +21,6 @@ export function Login() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/infinite_crypto`
-          }
         });
         if (error) throw error;
         navigate('/infinite_crypto');

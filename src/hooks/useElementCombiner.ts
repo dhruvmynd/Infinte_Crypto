@@ -1,7 +1,16 @@
 import { useState, useRef } from 'react';
 import Groq from 'groq-sdk';
 import { DraggableItem } from '../types';
-import { RATE_LIMIT_WINDOW, MAX_REQUESTS, COMBINATION_COOLDOWN, MAX_RETRIES, BASE_DELAY, getEmojiForCombination } from '../constants';
+import { 
+  RATE_LIMIT_WINDOW, 
+  MAX_REQUESTS, 
+  COMBINATION_COOLDOWN, 
+  MAX_RETRIES, 
+  BASE_DELAY, 
+  getEmojiForCombination,
+  getTranslationsForWord,
+  SupportedLanguage
+} from '../constants';
 
 const groq = new Groq({
   apiKey: import.meta.env.VITE_GROQ_API_KEY,
@@ -30,36 +39,53 @@ export function useElementCombiner() {
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-  const getFallbackWord = (element1: string, element2: string): string => {
-    const fallbacks: Record<string, Record<string, string>> = {
+  const getFallbackWord = (element1: string, element2: string): { word: string; translations: Record<SupportedLanguage, string> } => {
+    const fallbacks: Record<string, Record<string, { word: string; translations: Record<SupportedLanguage, string> }>> = {
       'Water': {
-        'Fire': 'Steam',
-        'Earth': 'River',
-        'Wind': 'Cloud'
-      },
-      'Fire': {
-        'Water': 'Steam',
-        'Earth': 'Magma',
-        'Wind': 'Smoke'
-      },
-      'Earth': {
-        'Water': 'River',
-        'Fire': 'Magma',
-        'Wind': 'Storm'
-      },
-      'Wind': {
-        'Water': 'Cloud',
-        'Fire': 'Smoke',
-        'Earth': 'Storm'
+        'Fire': {
+          word: 'Steam',
+          translations: {
+            en: 'Steam',
+            es: 'Vapor',
+            fr: 'Vapeur',
+            de: 'Dampf',
+            zh: '蒸汽'
+          }
+        },
+        'Earth': {
+          word: 'River',
+          translations: {
+            en: 'River',
+            es: 'Río',
+            fr: 'Rivière',
+            de: 'Fluss',
+            zh: '河流'
+          }
+        }
       }
+      // Add more fallbacks as needed
     };
 
-    return fallbacks[element1]?.[element2] || 
-           fallbacks[element2]?.[element1] || 
-           'Force';
+    const fallback = fallbacks[element1]?.[element2] || fallbacks[element2]?.[element1];
+    
+    if (fallback) {
+      return fallback;
+    }
+
+    // Default fallback with basic translations
+    return {
+      word: 'Force',
+      translations: {
+        en: 'Force',
+        es: 'Fuerza',
+        fr: 'Force',
+        de: 'Kraft',
+        zh: '力量'
+      }
+    };
   };
 
-  const getValidCombination = async (element1: string, element2: string, attempt = 1): Promise<{ word: string; emoji: string }> => {
+  const getValidCombination = async (element1: string, element2: string, attempt = 1): Promise<{ word: string; emoji: string; translations: Record<SupportedLanguage, string> }> => {
     try {
       const completion = await groq.chat.completions.create({
         messages: [
@@ -102,8 +128,11 @@ export function useElementCombiner() {
           newElement.length >= 4 && 
           newElement.length <= 15 && 
           /^[a-zA-Z]+$/.test(newElement)) {
-        const emoji = await getEmojiForCombination(newElement);
-        return { word: newElement, emoji };
+        const [emoji, translations] = await Promise.all([
+          getEmojiForCombination(newElement),
+          getTranslationsForWord(newElement)
+        ]);
+        return { word: newElement, emoji, translations };
       }
 
       if (attempt < MAX_RETRIES) {
@@ -112,7 +141,9 @@ export function useElementCombiner() {
         return getValidCombination(element1, element2, attempt + 1);
       }
 
-      return { word: getFallbackWord(element1, element2), emoji: '💫' };
+      const fallback = getFallbackWord(element1, element2);
+      const emoji = await getEmojiForCombination(fallback.word);
+      return { word: fallback.word, emoji, translations: fallback.translations };
     } catch (error) {
       console.error('Error in combination attempt:', error);
       if (attempt < MAX_RETRIES) {
@@ -120,7 +151,9 @@ export function useElementCombiner() {
         await sleep(delay);
         return getValidCombination(element1, element2, attempt + 1);
       }
-      return { word: getFallbackWord(element1, element2), emoji: '💫' };
+      const fallback = getFallbackWord(element1, element2);
+      const emoji = await getEmojiForCombination(fallback.word);
+      return { word: fallback.word, emoji, translations: fallback.translations };
     }
   };
 

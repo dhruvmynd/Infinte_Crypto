@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
-import { Search, X, ChevronRight, LogOut } from 'lucide-react';
+import { Search, X, ChevronRight, Wallet, LogOut, Mail } from 'lucide-react';
 import { DraggableItem } from '../types';
+import { useDisconnect } from "@thirdweb-dev/react";
+import { useProfile } from '../hooks/useProfile';
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
 
 interface ElementListProps {
   items: DraggableItem[];
@@ -9,8 +13,7 @@ interface ElementListProps {
   onDragStart: (e: React.DragEvent, item: DraggableItem) => void;
   deleteMode: boolean;
   onDelete: (itemId: string) => void;
-  userEmail?: string | null;
-  onSignOut?: () => void;
+  walletAddress?: string | null;
 }
 
 export function ElementList({ 
@@ -20,10 +23,12 @@ export function ElementList({
   onDragStart,
   deleteMode,
   onDelete,
-  userEmail,
-  onSignOut
+  walletAddress
 }: ElementListProps) {
   const [selectedElement, setSelectedElement] = useState<DraggableItem | null>(null);
+  const disconnect = useDisconnect();
+  const { profile } = useProfile();
+  const { user, loading } = useAuth();
 
   const baseElements = items.filter(item => item.isBaseElement);
   const generatedElements = items.filter(item => 
@@ -47,6 +52,15 @@ export function ElementList({
   const handleElementClick = (element: DraggableItem) => {
     if (deleteMode) return;
     setSelectedElement(selectedElement?.id === element.id ? null : element);
+  };
+
+  const handleSignOut = async () => {
+    if (walletAddress) {
+      disconnect();
+    } else {
+      await supabase.auth.signOut();
+    }
+    window.location.href = '/';
   };
 
   const renderOriginPath = (combination: DraggableItem) => {
@@ -169,23 +183,42 @@ export function ElementList({
         )}
       </div>
 
-      {/* User Profile Section */}
-      {userEmail && onSignOut && (
-        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-[200px]">
-              {userEmail}
-            </span>
-            <button
-              onClick={onSignOut}
-              className="p-2 bg-gray-800/80 hover:bg-gray-700 rounded-full transition-colors"
-              title="Sign out"
-            >
-              <LogOut size={16} className="text-white" />
-            </button>
-          </div>
+      {/* User Info Section */}
+      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col gap-2">
+          {walletAddress && (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 p-2 bg-gray-800/80 rounded-lg text-white flex-1">
+                <Wallet size={16} />
+                <span className="text-sm truncate">
+                  {`${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`}
+                </span>
+              </div>
+            </div>
+          )}
+          {user && (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 p-2 bg-gray-800/80 rounded-lg text-white flex-1">
+                <Mail size={16} />
+                <span className="text-sm truncate">{user.email}</span>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={handleSignOut}
+            className="flex items-center justify-center gap-2 w-full p-2 bg-gray-800/80 hover:bg-gray-700 rounded-lg transition-colors text-white"
+            title="Sign out"
+          >
+            <LogOut size={16} />
+            <span>Sign Out</span>
+          </button>
         </div>
-      )}
+        {profile && (
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Last login: {new Date(profile.last_login).toLocaleDateString()}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,11 +2,23 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { ThirdWebAuth } from '../components/ThirdWebAuth';
+import { useAddress } from "@thirdweb-dev/react";
+import { useAuth } from '../hooks/useAuth';
 
 export function Home() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const address = useAddress();
+  const { user } = useAuth();
+
+  // Redirect to game if user is authenticated through either method
+  React.useEffect(() => {
+    if (address || user) {
+      navigate('/infinite_crypto');
+    }
+  }, [address, user, navigate]);
 
   const handleEmailLogin = () => {
     navigate('/login');
@@ -20,11 +32,7 @@ export function Home() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/infinite_crypto`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          }
+          redirectTo: `${window.location.origin}/infinite_crypto`
         }
       });
 
@@ -36,6 +44,11 @@ export function Home() {
       setLoading(false);
     }
   };
+
+  // If already authenticated, don't render the login page
+  if (address || user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-500 via-blue-500 to-green-500">
@@ -89,6 +102,17 @@ export function Home() {
               </svg>
               <span>{loading ? 'Signing in...' : 'Continue with Google'}</span>
             </button>
+
+            <div className="relative py-3">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">Or</span>
+              </div>
+            </div>
+
+            <ThirdWebAuth />
           </div>
 
           <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-8">

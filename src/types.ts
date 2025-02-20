@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { SupportedLanguage } from './constants';
 
 export interface Point {
   id: number;
@@ -12,6 +13,7 @@ export interface Point {
 export interface DraggableItem {
   id: string;
   name: string;
+  translations?: Partial<Record<SupportedLanguage, string>>;
   icon: ReactNode | string;
   position: { x: number; y: number } | null;
   connectedPoints: Point[];

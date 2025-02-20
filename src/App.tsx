@@ -1,22 +1,22 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useAddress } from "@thirdweb-dev/react";
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
 import { InfiniteCrypto } from './pages/InfiniteCrypto';
 import { useAuth } from './hooks/useAuth';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
+  const address = useAddress();
   const { user, loading } = useAuth();
 
+  // Show nothing while checking authentication
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
-      </div>
-    );
+    return null;
   }
 
-  if (!user) {
+  // Allow access if either web3 or web2 authentication is present
+  if (!address && !user) {
     return <Navigate to="/" replace />;
   }
 
@@ -24,6 +24,13 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const { loading } = useAuth();
+
+  // Show nothing while checking authentication status
+  if (loading) {
+    return null;
+  }
+
   return (
     <BrowserRouter>
       <Routes>

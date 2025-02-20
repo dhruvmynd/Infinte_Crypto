@@ -7,12 +7,10 @@ import { useElementCombiner } from '../hooks/useElementCombiner';
 import { ElementList } from '../components/ElementList';
 import { DraggableItem } from '../types';
 import { baseElements, COMBINATION_DISTANCE } from '../constants';
-import { useAuth } from '../hooks/useAuth';
-import { supabase } from '../lib/supabase';
+import { useAddress } from "@thirdweb-dev/react";
 
 export function InfiniteCrypto() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [items, setItems] = useState<DraggableItem[]>(baseElements);
   const [draggingItem, setDraggingItem] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,6 +23,7 @@ export function InfiniteCrypto() {
     return false;
   });
   
+  const address = useAddress();
   const isDraggingRef = React.useRef(false);
   const dragStartPositionRef = React.useRef<{ x: number; y: number } | null>(null);
   const soundEffects = React.useRef<SoundEffects>();
@@ -53,11 +52,6 @@ export function InfiniteCrypto() {
   React.useEffect(() => {
     soundEffects.current = new SoundEffects();
   }, []);
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
-  };
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -327,6 +321,7 @@ export function InfiniteCrypto() {
           Infinite Crypto
         </h1>
       </div>
+      
       <div className="absolute top-4 right-4 z-10">
         <button
           onClick={toggleTheme}
@@ -340,6 +335,7 @@ export function InfiniteCrypto() {
           )}
         </button>
       </div>
+      
       <div className="w-full h-screen p-4">
         <div className="flex h-[calc(100vh-2rem)] gap-4">
           <div ref={containerRef} className="flex-1 relative">
@@ -403,8 +399,7 @@ export function InfiniteCrypto() {
             onDragStart={handleDragStart}
             deleteMode={deleteMode}
             onDelete={deleteElement}
-            userEmail={user?.email}
-            onSignOut={handleSignOut}
+            walletAddress={address}
           />
         </div>
       </div>
