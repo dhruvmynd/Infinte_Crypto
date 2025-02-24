@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
 import Groq from 'groq-sdk';
 import { DraggableItem } from '../types';
+import { supabase } from '../lib/supabase';
+import { useActivity } from './useActivity';
 import { 
   RATE_LIMIT_WINDOW, 
   MAX_REQUESTS, 
@@ -24,6 +26,7 @@ export function useElementCombiner() {
   const [combiningPosition, setCombiningPosition] = useState<{ x: number, y: number } | null>(null);
   const combinationInProgressRef = useRef(false);
   const lastCombinationTimeRef = useRef<number>(0);
+  const { trackActivity } = useActivity();
 
   const checkRateLimit = (): boolean => {
     const now = Date.now();
@@ -38,6 +41,70 @@ export function useElementCombiner() {
   };
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const updateCombinationCount = async (word: string, element1: string, element2: string) => {
+    try {
+      console.log('Updating combination count for:', word);
+      
+      const { data: existing, error: selectError } = await supabase
+        .from('element_combinations')
+        .select('id, count')
+        .eq('name', word)
+        .maybeSingle();
+
+      if (selectError) throw selectError;
+
+      if (existing) {
+        console.log('Existing combination found:', existing);
+        const { error: updateError } = await supabase
+          .from('element_combinations')
+          .update({ 
+            count: existing.count + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+          
+        if (updateError) throw updateError;
+
+        // Track the combination activity
+        await trackActivity({
+          activity_type: 'element_combined',
+          details: {
+            element_name: word,
+            total_combinations: existing.count + 1,
+            combined_from: [element1, element2]
+          }
+        });
+      } else {
+        console.log('Creating new combination entry');
+        const { error: insertError } = await supabase
+          .from('element_combinations')
+          .insert([{ 
+            name: word, 
+            count: 1,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }]);
+          
+        if (insertError) throw insertError;
+
+        // Track the new combination discovery
+        await trackActivity({
+          activity_type: 'combination_discovered',
+          details: {
+            element_name: word,
+            is_new: true,
+            combined_from: [element1, element2]
+          }
+        });
+      }
+      
+      console.log('Successfully updated combination count');
+    } catch (error) {
+      console.error('Error updating combination count:', error);
+      // Don't throw the error - allow the combination to proceed even if tracking fails
+    }
+  };
 
   const getFallbackWord = (element1: string, element2: string): { word: string; translations: Record<SupportedLanguage, string> } => {
     const fallbacks: Record<string, Record<string, { word: string; translations: Record<SupportedLanguage, string> }>> = {
@@ -63,16 +130,14 @@ export function useElementCombiner() {
           }
         }
       }
-      // Add more fallbacks as needed
     };
-
+    
     const fallback = fallbacks[element1]?.[element2] || fallbacks[element2]?.[element1];
     
     if (fallback) {
       return fallback;
     }
 
-    // Default fallback with basic translations
     return {
       word: 'Force',
       translations: {
@@ -115,7 +180,7 @@ export function useElementCombiner() {
             content: `Combine ${element1} and ${element2} into ONE meaningful word (4-15 letters). MUST be a real, logical word.`
           }
         ],
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.2-1b-preview',
         temperature: 0.7 + (attempt * 0.1),
         max_tokens: 1,
         top_p: 1,
@@ -125,13 +190,18 @@ export function useElementCombiner() {
       const newElement = completion.choices[0]?.message?.content?.trim();
       
       if (newElement && 
-          newElement.length >= 4 && 
+          newElement.length >= 6 && 
           newElement.length <= 15 && 
           /^[a-zA-Z]+$/.test(newElement)) {
+        
+        // Update combination count BEFORE getting emoji and translations
+        await updateCombinationCount(newElement, element1, element2);
+
         const [emoji, translations] = await Promise.all([
           getEmojiForCombination(newElement),
           getTranslationsForWord(newElement)
         ]);
+
         return { word: newElement, emoji, translations };
       }
 
@@ -143,6 +213,10 @@ export function useElementCombiner() {
 
       const fallback = getFallbackWord(element1, element2);
       const emoji = await getEmojiForCombination(fallback.word);
+
+      // Update combination count for fallback word
+      await updateCombinationCount(fallback.word, element1, element2);
+
       return { word: fallback.word, emoji, translations: fallback.translations };
     } catch (error) {
       console.error('Error in combination attempt:', error);
@@ -151,8 +225,13 @@ export function useElementCombiner() {
         await sleep(delay);
         return getValidCombination(element1, element2, attempt + 1);
       }
+
       const fallback = getFallbackWord(element1, element2);
       const emoji = await getEmojiForCombination(fallback.word);
+
+      // Update combination count for fallback word
+      await updateCombinationCount(fallback.word, element1, element2);
+
       return { word: fallback.word, emoji, translations: fallback.translations };
     }
   };

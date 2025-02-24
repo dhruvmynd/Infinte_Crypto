@@ -23,14 +23,14 @@ export function Login() {
           password,
         });
         if (error) throw error;
-        navigate('/infinite_crypto');
+        navigate('/infinite_ideas');
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
-        navigate('/infinite_crypto');
+        navigate('/infinite_ideas');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

@@ -2,7 +2,11 @@ import { useRef, useEffect } from 'react';
 import { usePoints } from './usePoints';
 import { DraggableItem } from '../types';
 
-export function useCanvas(items: DraggableItem[], draggingItem: string | null) {
+export function useCanvas(
+  items: DraggableItem[], 
+  draggingItem: string | null,
+  getElementName: (item: DraggableItem) => string
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number>();
@@ -41,8 +45,8 @@ export function useCanvas(items: DraggableItem[], draggingItem: string | null) {
   const drawElement = (ctx: CanvasRenderingContext2D, item: DraggableItem, isDarkMode: boolean) => {
     if (!item.position) return;
 
-    // Set line color based on theme
-    ctx.strokeStyle = isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)';
+    // Draw connections to nearby points
+    ctx.strokeStyle = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
     ctx.lineWidth = 1;
     item.connectedPoints.forEach(point => {
       ctx.beginPath();
@@ -51,16 +55,32 @@ export function useCanvas(items: DraggableItem[], draggingItem: string | null) {
       ctx.stroke();
     });
 
-    ctx.fillStyle = 'rgba(30, 30, 30, 0.8)';
-    ctx.beginPath();
-    ctx.roundRect(item.position.x - 30, item.position.y - 15, 60, 30, 15);
-    ctx.fill();
-
-    ctx.fillStyle = 'white';
+    // Get text metrics for proper background sizing
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(item.name, item.position.x, item.position.y);
+    const translatedName = getElementName(item);
+    const textMetrics = ctx.measureText(translatedName);
+    const textWidth = textMetrics.width;
+    const padding = 20;
+    const bgWidth = textWidth + (padding * 2);
+    const bgHeight = 30;
+
+    // Draw background
+    ctx.fillStyle = isDarkMode ? 'rgba(30, 30, 30, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+    ctx.beginPath();
+    ctx.roundRect(
+      item.position.x - (bgWidth / 2), 
+      item.position.y - (bgHeight / 2), 
+      bgWidth, 
+      bgHeight, 
+      15
+    );
+    ctx.fill();
+
+    // Draw text
+    ctx.fillStyle = isDarkMode ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)';
+    ctx.fillText(translatedName, item.position.x, item.position.y);
   };
 
   useEffect(() => {
@@ -70,7 +90,7 @@ export function useCanvas(items: DraggableItem[], draggingItem: string | null) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Initialize canvas size and points immediately
+    // Initialize canvas size and points
     const dimensions = updateCanvasSize();
     if (dimensions && !isInitializedRef.current) {
       initializePoints();
@@ -86,7 +106,9 @@ export function useCanvas(items: DraggableItem[], draggingItem: string | null) {
 
       // Check if dark mode is enabled
       const isDarkMode = document.documentElement.classList.contains('dark');
-      ctx.fillStyle = isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)';
+
+      // Draw and update points
+      ctx.fillStyle = isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)';
       updatePoints(deltaTime, dpr);
       
       points.forEach(point => {
@@ -95,6 +117,7 @@ export function useCanvas(items: DraggableItem[], draggingItem: string | null) {
         ctx.fill();
       });
 
+      // Update item connections and draw elements
       items.forEach(item => {
         if (item.position) {
           const nearbyPoints = points.filter(point => {
@@ -115,7 +138,7 @@ export function useCanvas(items: DraggableItem[], draggingItem: string | null) {
     };
 
     lastFrameTimeRef.current = performance.now();
-    animate(lastFrameTimeRef.current);
+    animationFrameRef.current = requestAnimationFrame(animate);
 
     const handleResize = () => {
       const newDimensions = updateCanvasSize();
@@ -133,7 +156,7 @@ export function useCanvas(items: DraggableItem[], draggingItem: string | null) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [items, draggingItem]);
+  }, [items, draggingItem, getElementName, points, initializePoints, updatePoints]);
 
   return { canvasRef, containerRef };
 }

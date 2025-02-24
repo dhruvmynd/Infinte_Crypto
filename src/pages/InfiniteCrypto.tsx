@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Volume2, VolumeX, Eraser, Trash2, Sun, Moon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { SoundEffects } from '../sounds';
 import { useCanvas } from '../hooks/useCanvas';
 import { useElementCombiner } from '../hooks/useElementCombiner';
-import { ElementList } from '../components/ElementList';
+import { useBackgrounds } from '../hooks/useBackgrounds';
+import ElementList from '../components/ElementList';
+import { AuthHeader } from '../components/AuthHeader';
 import { DraggableItem } from '../types';
 import { baseElements, COMBINATION_DISTANCE } from '../constants';
 import { useAddress } from "@thirdweb-dev/react";
+import { useProfile } from '../hooks/useProfile';
+import { useLanguage } from '../hooks/useLanguage';
 
-export function InfiniteCrypto() {
-  const navigate = useNavigate();
+export default function InfiniteIdeas() {
   const [items, setItems] = useState<DraggableItem[]>(baseElements);
   const [draggingItem, setDraggingItem] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,11 +26,20 @@ export function InfiniteCrypto() {
   });
   
   const address = useAddress();
-  const isDraggingRef = React.useRef(false);
-  const dragStartPositionRef = React.useRef<{ x: number; y: number } | null>(null);
-  const soundEffects = React.useRef<SoundEffects>();
+  const { profile } = useProfile();
+  const { currentLanguage } = useLanguage();
+  const isDraggingRef = useRef(false);
+  const dragStartPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const soundEffects = useRef<SoundEffects>();
+  const { backgrounds, selectedBackground, setSelectedBackground } = useBackgrounds();
+  const [selectedMode, setSelectedMode] = useState<'Basic' | 'Timed' | 'Category' | '1v1'>('Basic');
 
-  const { canvasRef, containerRef } = useCanvas(items, draggingItem);
+  const getElementName = (item: DraggableItem) => {
+    return item.translations?.[currentLanguage] || item.name;
+  };
+
+  const { canvasRef, containerRef } = useCanvas(items, draggingItem, getElementName);
+
   const {
     combining,
     combiningPosition,
@@ -41,16 +52,18 @@ export function InfiniteCrypto() {
     getValidCombination
   } = useElementCombiner();
 
-  React.useEffect(() => {
+  // Initialize sound effects
+  useEffect(() => {
+    soundEffects.current = new SoundEffects();
+  }, []);
+
+  // Theme initialization
+  useEffect(() => {
     const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
     setIsDark(isDarkMode);
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
     }
-  }, []);
-
-  React.useEffect(() => {
-    soundEffects.current = new SoundEffects();
   }, []);
 
   const toggleTheme = () => {
@@ -109,7 +122,8 @@ export function InfiniteCrypto() {
       position,
       isBaseElement: false,
       connectedPoints: [],
-      combinedFrom: [baseItem.name]
+      combinedFrom: [baseItem.name],
+      translations: baseItem.translations
     };
   };
 
@@ -133,7 +147,7 @@ export function InfiniteCrypto() {
     }
 
     try {
-      const { word: newElement, emoji } = await getValidCombination(element1.name, element2.name);
+      const { word: newElement, emoji, translations } = await getValidCombination(element1.name, element2.name);
       
       const now = Date.now();
       const newId = `combined-${now}`;
@@ -148,6 +162,7 @@ export function InfiniteCrypto() {
           {
             id: newId,
             name: newElement,
+            translations,
             icon: emoji,
             position: element1.position,
             connectedPoints: [],
@@ -156,6 +171,10 @@ export function InfiniteCrypto() {
           }
         ];
       });
+
+      if (soundEnabled && soundEffects.current) {
+        soundEffects.current.playCombineSound();
+      }
     } catch (error) {
       console.error('Error combining elements:', error);
     } finally {
@@ -316,32 +335,33 @@ export function InfiniteCrypto() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white transition-colors duration-200">
-      <div className="absolute top-4 left-4 z-10">
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 bg-clip-text text-transparent">
-          Infinite Crypto
-        </h1>
+      <div className="w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between h-16 px-4">
+          <h1 className="text-xl font-bold bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 bg-clip-text text-transparent">
+            Infinite Ideas
+          </h1>
+          <AuthHeader />
+        </div>
       </div>
-      
-      <div className="absolute top-4 right-4 z-10">
-        <button
-          onClick={toggleTheme}
-          className="p-2 bg-gray-800/80 hover:bg-gray-700 rounded-full transition-colors"
-          title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {isDark ? (
-            <Sun className="w-5 h-5 text-yellow-400" />
-          ) : (
-            <Moon className="w-5 h-5 text-gray-300" />
-          )}
-        </button>
-      </div>
-      
-      <div className="w-full h-screen p-4">
-        <div className="flex h-[calc(100vh-2rem)] gap-4">
+
+      <div className="w-full h-[calc(100vh-4rem)] p-4">
+        <div className="flex h-full gap-4">
           <div ref={containerRef} className="flex-1 relative">
+            <button
+              onClick={toggleTheme}
+              className="absolute top-4 right-4 p-2 bg-gray-800/80 hover:bg-gray-700 rounded-full transition-colors z-10"
+              title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {isDark ? (
+                <Sun className="w-5 h-5 text-white" />
+              ) : (
+                <Moon className="w-5 h-5 text-white" />
+              )}
+            </button>
+
             <canvas
               ref={canvasRef}
-              className={`w-full h-full bg-gray-50 dark:bg-black border border-gray-200 dark:border-gray-800 rounded-lg transition-colors duration-200 ${
+              className={`w-full h-full ${selectedBackground.className} border border-gray-200 dark:border-gray-800 rounded-lg transition-colors duration-200 ${
                 deleteMode ? 'cursor-pointer' : 'cursor-default'
               }`}
               onDrop={handleDrop}
@@ -400,9 +420,13 @@ export function InfiniteCrypto() {
             deleteMode={deleteMode}
             onDelete={deleteElement}
             walletAddress={address}
+            selectedMode={selectedMode}
+            onModeChange={setSelectedMode}
           />
         </div>
       </div>
     </div>
   );
 }
+
+export { InfiniteIdeas }

@@ -16,7 +16,7 @@ export function Home() {
   // Redirect to game if user is authenticated through either method
   React.useEffect(() => {
     if (address || user) {
-      navigate('/infinite_crypto');
+      navigate('/infinite_ideas');
     }
   }, [address, user, navigate]);
 
@@ -32,7 +32,7 @@ export function Home() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/infinite_crypto`
+          redirectTo: `${window.location.origin}/infinite_ideas`
         }
       });
 
@@ -55,10 +55,10 @@ export function Home() {
       <div className="container mx-auto px-4 h-screen flex items-center justify-center">
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-2xl w-full max-w-md">
           <h1 className="text-4xl font-bold text-center mb-2 bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 bg-clip-text text-transparent">
-            Infinite Crypto
+            Infinite Ideas
           </h1>
           <p className="text-gray-600 dark:text-gray-300 text-center mb-8">
-            Combine elements to discover endless crypto possibilities
+            Combine elements to discover endless possibilities
           </p>
 
           {error && (

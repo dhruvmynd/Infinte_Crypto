@@ -6,6 +6,7 @@ interface Profile {
   id: string;
   user_id: string | null;
   wallet_address: string | null;
+  email: string | null;
   created_at: string;
   updated_at: string;
   last_login: string;
@@ -13,89 +14,188 @@ interface Profile {
   chain_id: string | null;
 }
 
+interface CreateProfileParams {
+  wallet_address?: string;
+  user_id?: string;
+  email?: string;
+  web3_provider?: string;
+  chain_id?: string;
+}
+
+const MAX_RETRIES = 2;
+const RETRY_DELAY = 1000;
+const QUERY_TIMEOUT = 10000; // 10 seconds
+
 export function useProfile() {
   const address = useAddress();
   const queryClient = useQueryClient();
 
-  // Fetch profile
+  // Fetch profile based on either wallet address or user ID
   const { data: profile, isLoading, error } = useQuery({
-    queryKey: ['profile', address],
-    queryFn: async () => {
+    queryKey: ['profile', address?.toLowerCase()],
+    queryFn: async ({ signal }) => {
       if (!address) return null;
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('wallet_address', address.toLowerCase())
-        .maybeSingle();
+      const normalizedAddress = address.toLowerCase();
+      console.log('Fetching profile for address:', normalizedAddress);
 
-      if (error) throw error;
-      return data as Profile | null;
+      try {
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Profile fetch timeout')), QUERY_TIMEOUT);
+        });
+
+        // Create the fetch promise
+        const fetchPromise = supabase
+          .from('profiles')
+          .select('*')
+          .eq('wallet_address', normalizedAddress)
+          .maybeSingle()
+          .abortSignal(signal);
+
+        // Race between fetch and timeout
+        const { data, error } = await Promise.race([
+          fetchPromise,
+          timeoutPromise
+        ]) as any;
+
+        if (error) {
+          console.error('Supabase error fetching profile:', error);
+          throw error;
+        }
+
+        console.log('Profile data:', data);
+        return data as Profile | null;
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.log('Profile fetch aborted - this is normal during cleanup');
+          return null;
+        }
+        console.error('Error in profile query:', error);
+        throw error;
+      }
     },
     enabled: !!address,
-    retry: 1
+    retry: MAX_RETRIES,
+    retryDelay: RETRY_DELAY,
+    staleTime: 30000, // 30 seconds
+    cacheTime: 60000, // 1 minute
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false
   });
 
   // Create or update profile
-  const { mutate: createProfile } = useMutation({
-    mutationFn: async (newProfile: { wallet_address: string; web3_provider?: string; chain_id?: string }) => {
-      const normalizedAddress = newProfile.wallet_address.toLowerCase();
+  const { mutate: createProfile, isLoading: isCreating } = useMutation({
+    mutationFn: async (params: CreateProfileParams) => {
+      try {
+        // Handle web3 users
+        if (params.wallet_address) {
+          const normalizedAddress = params.wallet_address.toLowerCase();
+          console.log('Creating/updating profile for address:', normalizedAddress);
+          
+          // First try to find existing profile
+          const { data: existingProfile, error: findError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('wallet_address', normalizedAddress)
+            .maybeSingle();
 
-      // First try to update existing profile
-      const { data: existingProfile, error: fetchError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('wallet_address', normalizedAddress)
-        .maybeSingle();
+          if (findError) {
+            console.error('Error finding existing profile:', findError);
+            throw findError;
+          }
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        throw fetchError;
+          // If profile exists, update it
+          if (existingProfile) {
+            console.log('Updating existing profile:', existingProfile.id);
+            const { data, error: updateError } = await supabase
+              .from('profiles')
+              .update({
+                web3_provider: params.web3_provider,
+                chain_id: params.chain_id,
+                last_login: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingProfile.id)
+              .select()
+              .single();
+
+            if (updateError) {
+              console.error('Error updating profile:', updateError);
+              throw updateError;
+            }
+            return data;
+          }
+
+          // If no profile exists, create a new one
+          console.log('Creating new profile for address:', normalizedAddress);
+          const { data, error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              wallet_address: normalizedAddress,
+              web3_provider: params.web3_provider,
+              chain_id: params.chain_id,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              last_login: new Date().toISOString()
+            })
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error('Error inserting profile:', insertError);
+            throw insertError;
+          }
+          return data;
+        }
+
+        // Handle web2 users
+        if (params.user_id && params.email) {
+          console.log('Creating/updating web2 profile for user:', params.user_id);
+          const { data, error } = await supabase
+            .from('profiles')
+            .upsert(
+              {
+                user_id: params.user_id,
+                email: params.email,
+                last_login: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              },
+              {
+                onConflict: 'user_id',
+                ignoreDuplicates: false
+              }
+            )
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error upserting web2 profile:', error);
+            throw error;
+          }
+          return data;
+        }
+
+        throw new Error('Either wallet_address or both user_id and email are required');
+      } catch (error) {
+        console.error('Profile mutation error:', error);
+        throw error;
       }
-
-      if (existingProfile) {
-        // Update existing profile
-        const { data, error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            last_login: new Date().toISOString(),
-            web3_provider: newProfile.web3_provider,
-            chain_id: newProfile.chain_id,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingProfile.id)
-          .select()
-          .single();
-
-        if (updateError) throw updateError;
-        return data;
-      }
-
-      // Create new profile if it doesn't exist
-      const { data, error: insertError } = await supabase
-        .from('profiles')
-        .insert([{
-          wallet_address: normalizedAddress,
-          web3_provider: newProfile.web3_provider,
-          chain_id: newProfile.chain_id,
-          last_login: new Date().toISOString()
-        }])
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-      return data;
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(['profile', address], data);
+      console.log('Profile created/updated successfully:', data);
+      queryClient.setQueryData(['profile', address?.toLowerCase()], data);
     },
     onError: (error) => {
-      console.error('Error creating/updating profile:', error);
-    }
+      console.error('Error in profile mutation:', error);
+    },
+    retry: MAX_RETRIES,
+    retryDelay: RETRY_DELAY
   });
 
   return {
     profile,
-    isLoading,
+    isLoading: isLoading || isCreating,
     error,
     createProfile
   };

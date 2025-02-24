@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Search, X, ChevronRight, Wallet, LogOut, Mail } from 'lucide-react';
+import { Search, X, Play, Timer, ShoppingBag, Lightbulb, Sparkles, Clock, Target, Users, Gamepad2 } from 'lucide-react';
 import { DraggableItem } from '../types';
-import { useDisconnect } from "@thirdweb-dev/react";
 import { useProfile } from '../hooks/useProfile';
 import { useAuth } from '../hooks/useAuth';
-import { supabase } from '../lib/supabase';
+import { useRarity } from '../hooks/useRarity';
+import { useLanguage } from '../hooks/useLanguage';
+import { SUPPORTED_LANGUAGES, type SupportedLanguage } from '../constants';
+import { Timer as TimerComponent } from './Timer';
 
 interface ElementListProps {
   items: DraggableItem[];
@@ -14,79 +16,194 @@ interface ElementListProps {
   deleteMode: boolean;
   onDelete: (itemId: string) => void;
   walletAddress?: string | null;
+  selectedMode: 'Basic' | 'Timed' | 'Category' | '1v1';
+  onModeChange: (mode: 'Basic' | 'Timed' | 'Category' | '1v1') => void;
 }
 
-export function ElementList({ 
+const LANGUAGE_NAMES: Record<SupportedLanguage, string> = {
+  en: 'English',
+  es: 'Español',
+  fr: 'Français',
+  de: 'Deutsch',
+  zh: '中文'
+};
+
+const MODES = [
+  { id: 'Basic', icon: Gamepad2, label: 'Basic Mode' },
+  { id: 'Timed', icon: Clock, label: 'Timed Mode' },
+  { id: 'Category', icon: Target, label: 'Category Mode' },
+  { id: '1v1', icon: Users, label: '1v1 Mode' }
+] as const;
+
+export default function ElementList({ 
   items, 
   searchTerm, 
   onSearchChange, 
   onDragStart,
   deleteMode,
   onDelete,
-  walletAddress
+  walletAddress,
+  selectedMode,
+  onModeChange
 }: ElementListProps) {
   const [selectedElement, setSelectedElement] = useState<DraggableItem | null>(null);
-  const disconnect = useDisconnect();
   const { profile } = useProfile();
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
+  const { calculateRarity } = useRarity();
+  const { currentLanguage, setCurrentLanguage, translate } = useLanguage();
+  const [isTimerActive, setIsTimerActive] = useState(false);
+  const [isTimeUp, setIsTimeUp] = useState(false);
 
+  const getElementName = (item: DraggableItem) => {
+    return item.translations?.[currentLanguage] || item.name;
+  };
+
+  const handleStartTimer = () => {
+    setIsTimerActive(true);
+    setIsTimeUp(false);
+  };
+
+  const handleTimeEnd = () => {
+    setIsTimeUp(true);
+    setIsTimerActive(false);
+  };
+
+  const handleDragStart = (e: React.DragEvent, item: DraggableItem) => {
+    if (selectedMode === 'Timed' && (isTimeUp || !isTimerActive)) {
+      e.preventDefault();
+      return;
+    }
+    onDragStart(e, item);
+  };
+
+  // Filter elements
   const baseElements = items.filter(item => item.isBaseElement);
-  const generatedElements = items.filter(item => 
-    !item.isBaseElement && 
-    item.position && 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const generatedElements = items.filter(item => !item.isBaseElement);
 
   const filteredBaseElements = baseElements.filter(item => 
+    getElementName(item).toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getRelatedCombinations = (element: DraggableItem) => {
-    return items.filter(item => 
-      !item.isBaseElement && 
-      item.position &&
-      (item.combinedFrom?.includes(element.name) || false)
-    );
-  };
+  const filteredGeneratedElements = generatedElements.filter(item => 
+    getElementName(item).toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleElementClick = (element: DraggableItem) => {
     if (deleteMode) return;
     setSelectedElement(selectedElement?.id === element.id ? null : element);
   };
 
-  const handleSignOut = async () => {
-    if (walletAddress) {
-      disconnect();
-    } else {
-      await supabase.auth.signOut();
-    }
-    window.location.href = '/';
-  };
-
-  const renderOriginPath = (combination: DraggableItem) => {
-    if (!combination.combinedFrom) return null;
+  const renderRarityIndicator = (name: string) => {
+    const rarity = calculateRarity(name);
+    const color = rarity > 80 ? 'bg-red-500' : rarity > 50 ? 'bg-yellow-500' : 'bg-green-500';
     
     return (
-      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center flex-wrap gap-1">
-        {combination.combinedFrom.map((element, index) => (
-          <React.Fragment key={index}>
-            {index > 0 && <ChevronRight size={12} className="inline" />}
-            <span className="bg-gray-100 dark:bg-gray-600 px-1.5 py-0.5 rounded">
-              {element}
-            </span>
-          </React.Fragment>
-        ))}
+      <div className="absolute -top-1 -right-1 flex items-center gap-1">
+        <span className="text-xs font-medium bg-gray-800/80 text-white px-1.5 py-0.5 rounded">
+          {rarity}%
+        </span>
+        <div className={`w-2 h-2 rounded-full ${color}`} />
       </div>
     );
   };
 
+  const renderElement = (item: DraggableItem) => (
+    <div
+      key={item.id}
+      className="group relative space-y-1"
+    >
+      <div
+        className={`flex items-center gap-2 p-2 rounded cursor-move hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800 ${
+          deleteMode || (selectedMode === 'Timed' && (isTimeUp || !isTimerActive)) ? 'pointer-events-none opacity-50' : ''
+        } ${selectedElement?.id === item.id ? 'ring-2 ring-purple-500' : ''}`}
+        draggable={!deleteMode && !(selectedMode === 'Timed' && (isTimeUp || !isTimerActive))}
+        onDragStart={(e) => handleDragStart(e, item)}
+        onClick={() => handleElementClick(item)}
+      >
+        <span className="text-xl">{typeof item.icon === 'string' ? item.icon : '💫'}</span>
+        <span className="flex-1 text-sm truncate">{getElementName(item)}</span>
+        {!item.isBaseElement && renderRarityIndicator(item.name)}
+      </div>
+    </div>
+  );
+
   return (
     <div className="w-96 shrink-0 bg-gray-100 dark:bg-gray-900 p-4 rounded-lg flex flex-col h-full transition-colors duration-200">
-      <h2 className="text-xl font-bold mb-4">Elements</h2>
+      {/* Game Mode Selection */}
+      <div className="grid grid-cols-4 gap-2 mb-4">
+        {MODES.map(({ id, icon: Icon, label }) => (
+          <button
+            key={id}
+            onClick={() => onModeChange(id)}
+            className={`flex flex-col items-center justify-center p-3 rounded-lg transition-colors ${
+              id === selectedMode
+                ? 'bg-blue-500 text-white'
+                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+            title={label}
+          >
+            <Icon size={20} />
+          </button>
+        ))}
+      </div>
+
+      {/* Timer Section */}
+      {selectedMode === 'Timed' && (
+        <div className="mb-4">
+          {!isTimerActive && !isTimeUp ? (
+            <button
+              onClick={handleStartTimer}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+            >
+              <Play size={16} />
+              <span>Start Timer</span>
+            </button>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+              <TimerComponent
+                initialTime={60}
+                onTimeEnd={handleTimeEnd}
+                isActive={isTimerActive}
+              />
+              {isTimeUp && (
+                <div className="text-center text-red-500 font-medium">
+                  Time's up! Start a new round to continue.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Language Selection */}
+      <div className="mb-4">
+        <div className="grid grid-cols-2 gap-2">
+          {SUPPORTED_LANGUAGES.map((lang) => (
+            <button
+              key={lang}
+              onClick={() => lang === 'en' && setCurrentLanguage(lang)}
+              disabled={lang !== 'en'}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                currentLanguage === lang
+                  ? 'bg-blue-500 text-white'
+                  : lang === 'en'
+                  ? 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {LANGUAGE_NAMES[lang]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Search Bar */}
       <div className="relative mb-4 flex-shrink-0">
         <input
           type="text"
-          placeholder="Search elements..."
+          placeholder={translate('searchElements')}
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-4 py-2 rounded-lg pr-10 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors duration-200"
@@ -94,130 +211,85 @@ export function ElementList({
         <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
       </div>
 
-      {selectedElement && (
-        <div className="mb-4 p-4 bg-white dark:bg-gray-800 rounded-lg">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-semibold">Combinations with {selectedElement.name}</h3>
-            <button
-              onClick={() => setSelectedElement(null)}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            >
-              <X size={16} />
-            </button>
-          </div>
-          <div className="space-y-2">
-            {getRelatedCombinations(selectedElement).map(combination => (
-              <div
-                key={combination.id}
-                className="p-2 bg-gray-50 dark:bg-gray-700 rounded"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{combination.icon}</span>
-                  <span className="text-sm font-medium">{combination.name}</span>
-                </div>
-                {renderOriginPath(combination)}
-              </div>
-            ))}
-          </div>
-          {getRelatedCombinations(selectedElement).length === 0 && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              No combinations found yet. Try combining with other elements!
-            </p>
-          )}
-        </div>
-      )}
-
+      {/* Elements Section */}
       <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-1">
-        {/* Base Elements Section */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">Base Elements</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {filteredBaseElements.map(item => (
-              <div
-                key={item.id}
-                className={`group relative flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800 ${
-                  deleteMode ? 'pointer-events-none opacity-50' : ''
-                } ${selectedElement?.id === item.id ? 'ring-2 ring-purple-500' : ''}`}
-                draggable={!deleteMode}
-                onDragStart={(e) => onDragStart(e, item)}
-                onClick={() => handleElementClick(item)}
-              >
-                <span className="text-xl">{typeof item.icon === 'string' ? item.icon : '💫'}</span>
-                <span className="flex-1 text-sm truncate">{item.name}</span>
-              </div>
-            ))}
-          </div>
+        {/* Base Elements */}
+        <div className="grid grid-cols-2 gap-2">
+          {filteredBaseElements.map(item => renderElement(item))}
         </div>
 
-        {/* Generated Elements Section */}
-        {generatedElements.length > 0 && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">Generated Elements</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {generatedElements.map(item => (
-                <div
-                  key={item.id}
-                  className="group relative space-y-1"
-                >
-                  <div
-                    className={`flex items-center gap-2 p-2 rounded cursor-move hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800 ${
-                      deleteMode ? 'pointer-events-none opacity-50' : ''
-                    }`}
-                    draggable={!deleteMode}
-                    onDragStart={(e) => onDragStart(e, item)}
-                  >
-                    <span className="text-xl">{typeof item.icon === 'string' ? item.icon : '💫'}</span>
-                    <span className="flex-1 text-sm truncate">{item.name}</span>
-                  </div>
-                  {renderOriginPath(item)}
-                </div>
-              ))}
-            </div>
+        {/* Generated Elements */}
+        {filteredGeneratedElements.length > 0 && (
+          <div className="grid grid-cols-2 gap-2">
+            {filteredGeneratedElements.map(item => renderElement(item))}
           </div>
         )}
 
-        {searchTerm && filteredBaseElements.length === 0 && generatedElements.length === 0 && (
+        {searchTerm && filteredBaseElements.length === 0 && filteredGeneratedElements.length === 0 && (
           <p className="text-center text-gray-500 dark:text-gray-400 py-4">
-            No elements found matching "{searchTerm}"
+            {translate('noElementsFound')} "{searchTerm}"
           </p>
         )}
-      </div>
 
-      {/* User Info Section */}
-      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex flex-col gap-2">
-          {walletAddress && (
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 p-2 bg-gray-800/80 rounded-lg text-white flex-1">
-                <Wallet size={16} />
-                <span className="text-sm truncate">
-                  {`${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`}
-                </span>
+        {/* Power Ups Section */}
+        <div className="pt-4">
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mb-1">
+                <ShoppingBag className="w-6 h-6 text-yellow-500" />
               </div>
+              <span className="text-xs text-center">Word Packs</span>
+              <span className="text-xs font-bold">3</span>
             </div>
-          )}
-          {user && (
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 p-2 bg-gray-800/80 rounded-lg text-white flex-1">
-                <Mail size={16} />
-                <span className="text-sm truncate">{user.email}</span>
+            
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-1">
+                <Timer className="w-6 h-6 text-blue-500" />
               </div>
+              <span className="text-xs text-center">Time</span>
+              <span className="text-xs font-bold">2</span>
             </div>
-          )}
-          <button
-            onClick={handleSignOut}
-            className="flex items-center justify-center gap-2 w-full p-2 bg-gray-800/80 hover:bg-gray-700 rounded-lg transition-colors text-white"
-            title="Sign out"
-          >
-            <LogOut size={16} />
-            <span>Sign Out</span>
-          </button>
-        </div>
-        {profile && (
-          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Last login: {new Date(profile.last_login).toLocaleDateString()}
+            
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mb-1">
+                <Lightbulb className="w-6 h-6 text-purple-500" />
+              </div>
+              <span className="text-xs text-center">Hint</span>
+              <span className="text-xs font-bold">5</span>
+            </div>
+            
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-full flex items-center justify-center mb-1">
+                <Sparkles className="w-6 h-6 text-pink-500" />
+              </div>
+              <span className="text-xs text-center">Wild</span>
+              <span className="text-xs font-bold">1</span>
+            </div>
           </div>
-        )}
+
+          <div className="mb-4">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div className="bg-purple-500 h-2 rounded-full" style={{ width: '60%' }}></div>
+            </div>
+            <div className="flex justify-between text-sm mt-1">
+              <span>30 Found</span>
+              <span>20 Remaining</span>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              className="flex-1 bg-blue-500 hover:bg-blue-600 text-white rounded-lg py-2 text-sm font-medium transition-colors"
+            >
+              Buy Words
+            </button>
+            <button
+              className="flex-1 bg-purple-500 hover:bg-purple-600 text-white rounded-lg py-2 text-sm font-medium transition-colors"
+            >
+              Get Tokens
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

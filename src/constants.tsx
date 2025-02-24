@@ -11,6 +11,95 @@ export const BASE_DELAY = 500; // Base delay in milliseconds
 export const SUPPORTED_LANGUAGES = ['en', 'es', 'fr', 'de', 'zh'] as const;
 export type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
 
+// UI translations
+export const UI_TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
+  en: {
+    elements: 'Elements',
+    mode: 'Mode',
+    basic: 'Basic',
+    timed: 'Timed',
+    category: 'Category',
+    oneVsOne: '1v1',
+    language: 'Language',
+    searchElements: 'Search elements...',
+    baseElements: 'Base Elements',
+    generatedElements: 'Generated Elements',
+    noElementsFound: 'No elements found matching',
+    lastActive: 'Last active',
+    documentation: 'Documentation',
+    signOut: 'Sign Out',
+    changeBackground: 'Change background'
+  },
+  es: {
+    elements: 'Elementos',
+    mode: 'Modo',
+    basic: 'Básico',
+    timed: 'Tiempo',
+    category: 'Categoría',
+    oneVsOne: '1v1',
+    language: 'Idioma',
+    searchElements: 'Buscar elementos...',
+    baseElements: 'Elementos Base',
+    generatedElements: 'Elementos Generados',
+    noElementsFound: 'No se encontraron elementos que coincidan con',
+    lastActive: 'Última actividad',
+    documentation: 'Documentación',
+    signOut: 'Cerrar Sesión',
+    changeBackground: 'Cambiar fondo'
+  },
+  fr: {
+    elements: 'Éléments',
+    mode: 'Mode',
+    basic: 'Basique',
+    timed: 'Chronométré',
+    category: 'Catégorie',
+    oneVsOne: '1v1',
+    language: 'Langue',
+    searchElements: 'Rechercher des éléments...',
+    baseElements: 'Éléments de Base',
+    generatedElements: 'Éléments Générés',
+    noElementsFound: 'Aucun élément trouvé correspondant à',
+    lastActive: 'Dernière activité',
+    documentation: 'Documentation',
+    signOut: 'Déconnexion',
+    changeBackground: 'Changer le fond'
+  },
+  de: {
+    elements: 'Elemente',
+    mode: 'Modus',
+    basic: 'Basis',
+    timed: 'Zeit',
+    category: 'Kategorie',
+    oneVsOne: '1v1',
+    language: 'Sprache',
+    searchElements: 'Elemente suchen...',
+    baseElements: 'Basiselemente',
+    generatedElements: 'Generierte Elemente',
+    noElementsFound: 'Keine Elemente gefunden für',
+    lastActive: 'Zuletzt aktiv',
+    documentation: 'Dokumentation',
+    signOut: 'Abmelden',
+    changeBackground: 'Hintergrund ändern'
+  },
+  zh: {
+    elements: '元素',
+    mode: '模式',
+    basic: '基础',
+    timed: '计时',
+    category: '分类',
+    oneVsOne: '1v1',
+    language: '语言',
+    searchElements: '搜索元素...',
+    baseElements: '基础元素',
+    generatedElements: '生成的元素',
+    noElementsFound: '未找到匹配的元素',
+    lastActive: '上次活动',
+    documentation: '文档',
+    signOut: '退出登录',
+    changeBackground: '更改背景'
+  }
+};
+
 export const baseElements: DraggableItem[] = [
   // Original elements with multilingual names
   { 
@@ -100,57 +189,43 @@ export const baseElements: DraggableItem[] = [
     isBaseElement: true 
   },
   { 
+    id: 'blockchain', 
+    name: 'Blockchain',
+    translations: {
+      es: 'Cadena de Bloques',
+      fr: 'Chaîne de Blocs',
+      de: 'Blockchain',
+      zh: '区块链'
+    },
+    icon: '🔗', 
+    position: null, 
+    connectedPoints: [], 
+    isBaseElement: true 
+  },
+  { 
+    id: 'smart-contract', 
+    name: 'Smart Contract',
+    translations: {
+      es: 'Contrato Inteligente',
+      fr: 'Contrat Intelligent',
+      de: 'Smart Contract',
+      zh: '智能合约'
+    },
+    icon: '📜', 
+    position: null, 
+    connectedPoints: [], 
+    isBaseElement: true 
+  },
+  { 
     id: 'wallet', 
     name: 'Wallet',
     translations: {
-      es: 'Cartera',
+      es: 'Monedero',
       fr: 'Portefeuille',
-      de: 'Geldbörse',
+      de: 'Wallet',
       zh: '钱包'
     },
     icon: '👛', 
-    position: null, 
-    connectedPoints: [], 
-    isBaseElement: true 
-  },
-  { 
-    id: 'exchange', 
-    name: 'Exchange',
-    translations: {
-      es: 'Intercambio',
-      fr: 'Échange',
-      de: 'Börse',
-      zh: '交易所'
-    },
-    icon: '🔄', 
-    position: null, 
-    connectedPoints: [], 
-    isBaseElement: true 
-  },
-  { 
-    id: 'token', 
-    name: 'Token',
-    translations: {
-      es: 'Token',
-      fr: 'Jeton',
-      de: 'Token',
-      zh: '代币'
-    },
-    icon: '🪙', 
-    position: null, 
-    connectedPoints: [], 
-    isBaseElement: true 
-  },
-  { 
-    id: 'defi', 
-    name: 'DeFi',
-    translations: {
-      es: 'DeFi',
-      fr: 'DeFi',
-      de: 'DeFi',
-      zh: '去中心化金融'
-    },
-    icon: '🏦', 
     position: null, 
     connectedPoints: [], 
     isBaseElement: true 
@@ -170,55 +245,34 @@ export const baseElements: DraggableItem[] = [
     isBaseElement: true 
   },
   { 
-    id: 'blockchain', 
-    name: 'Blockchain',
+    id: 'defi', 
+    name: 'DeFi',
     translations: {
-      es: 'Blockchain',
-      fr: 'Blockchain',
-      de: 'Blockchain',
-      zh: '区块链'
+      es: 'DeFi',
+      fr: 'DeFi',
+      de: 'DeFi',
+      zh: '去中心化金融'
     },
-    icon: '🔗', 
+    icon: '🏦', 
+    position: null, 
+    connectedPoints: [], 
+    isBaseElement: true 
+  },
+  { 
+    id: 'nft', 
+    name: 'NFT',
+    translations: {
+      es: 'NFT',
+      fr: 'NFT',
+      de: 'NFT',
+      zh: '非同质化代币'
+    },
+    icon: '🎨', 
     position: null, 
     connectedPoints: [], 
     isBaseElement: true 
   }
 ];
-
-// Common combinations with predefined emojis and translations
-export const combinationEmojis: Record<string, { emoji: string; translations: Record<SupportedLanguage, string> }> = {
-  'Steam': {
-    emoji: '♨️',
-    translations: {
-      en: 'Steam',
-      es: 'Vapor',
-      fr: 'Vapeur',
-      de: 'Dampf',
-      zh: '蒸汽'
-    }
-  },
-  'River': {
-    emoji: '🌊',
-    translations: {
-      en: 'River',
-      es: 'Río',
-      fr: 'Rivière',
-      de: 'Fluss',
-      zh: '河流'
-    }
-  },
-  'Cloud': {
-    emoji: '☁️',
-    translations: {
-      en: 'Cloud',
-      es: 'Nube',
-      fr: 'Nuage',
-      de: 'Wolke',
-      zh: '云'
-    }
-  },
-  // Add more combinations as needed...
-};
 
 // Cache for generated translations and emojis
 const translationCache: Record<string, Record<SupportedLanguage, string>> = {};
@@ -289,11 +343,6 @@ export async function getTranslationsForWord(word: string): Promise<Record<Suppo
 }
 
 export async function getEmojiForCombination(word: string): Promise<string> {
-  // Return predefined emoji if available
-  if (combinationEmojis[word]) {
-    return combinationEmojis[word].emoji;
-  }
-
   // Return cached emoji if available
   if (emojiCache[word]) {
     return emojiCache[word];
