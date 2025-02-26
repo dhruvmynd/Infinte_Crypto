@@ -101,21 +101,6 @@ export const UI_TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> 
 };
 
 export const baseElements: DraggableItem[] = [
-  // Original elements with multilingual names
-  { 
-    id: 'water', 
-    name: 'Water', 
-    translations: {
-      es: 'Agua',
-      fr: 'Eau',
-      de: 'Wasser',
-      zh: '水'
-    },
-    icon: '💧', 
-    position: null, 
-    connectedPoints: [], 
-    isBaseElement: true 
-  },
   { 
     id: 'fire', 
     name: 'Fire',
@@ -131,15 +116,15 @@ export const baseElements: DraggableItem[] = [
     isBaseElement: true 
   },
   { 
-    id: 'wind', 
-    name: 'Wind',
+    id: 'water', 
+    name: 'Water', 
     translations: {
-      es: 'Viento',
-      fr: 'Vent',
-      de: 'Wind',
-      zh: '风'
+      es: 'Agua',
+      fr: 'Eau',
+      de: 'Wasser',
+      zh: '水'
     },
-    icon: '💨', 
+    icon: '💧', 
     position: null, 
     connectedPoints: [], 
     isBaseElement: true 
@@ -158,8 +143,6 @@ export const baseElements: DraggableItem[] = [
     connectedPoints: [], 
     isBaseElement: true 
   },
-  
-  // Crypto elements with translations
   { 
     id: 'bitcoin', 
     name: 'Bitcoin',
@@ -170,104 +153,6 @@ export const baseElements: DraggableItem[] = [
       zh: '比特币'
     },
     icon: '₿', 
-    position: null, 
-    connectedPoints: [], 
-    isBaseElement: true 
-  },
-  { 
-    id: 'ethereum', 
-    name: 'Ethereum',
-    translations: {
-      es: 'Ethereum',
-      fr: 'Ethereum',
-      de: 'Ethereum',
-      zh: '以太坊'
-    },
-    icon: 'Ξ', 
-    position: null, 
-    connectedPoints: [], 
-    isBaseElement: true 
-  },
-  { 
-    id: 'blockchain', 
-    name: 'Blockchain',
-    translations: {
-      es: 'Cadena de Bloques',
-      fr: 'Chaîne de Blocs',
-      de: 'Blockchain',
-      zh: '区块链'
-    },
-    icon: '🔗', 
-    position: null, 
-    connectedPoints: [], 
-    isBaseElement: true 
-  },
-  { 
-    id: 'smart-contract', 
-    name: 'Smart Contract',
-    translations: {
-      es: 'Contrato Inteligente',
-      fr: 'Contrat Intelligent',
-      de: 'Smart Contract',
-      zh: '智能合约'
-    },
-    icon: '📜', 
-    position: null, 
-    connectedPoints: [], 
-    isBaseElement: true 
-  },
-  { 
-    id: 'wallet', 
-    name: 'Wallet',
-    translations: {
-      es: 'Monedero',
-      fr: 'Portefeuille',
-      de: 'Wallet',
-      zh: '钱包'
-    },
-    icon: '👛', 
-    position: null, 
-    connectedPoints: [], 
-    isBaseElement: true 
-  },
-  { 
-    id: 'mining', 
-    name: 'Mining',
-    translations: {
-      es: 'Minería',
-      fr: 'Minage',
-      de: 'Mining',
-      zh: '挖矿'
-    },
-    icon: '⛏️', 
-    position: null, 
-    connectedPoints: [], 
-    isBaseElement: true 
-  },
-  { 
-    id: 'defi', 
-    name: 'DeFi',
-    translations: {
-      es: 'DeFi',
-      fr: 'DeFi',
-      de: 'DeFi',
-      zh: '去中心化金融'
-    },
-    icon: '🏦', 
-    position: null, 
-    connectedPoints: [], 
-    isBaseElement: true 
-  },
-  { 
-    id: 'nft', 
-    name: 'NFT',
-    translations: {
-      es: 'NFT',
-      fr: 'NFT',
-      de: 'NFT',
-      zh: '非同质化代币'
-    },
-    icon: '🎨', 
     position: null, 
     connectedPoints: [], 
     isBaseElement: true 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useAddress } from "@thirdweb-dev/react";
-import { InfiniteIdeas } from './pages/InfiniteCrypto';
+import InfiniteCrypto from './pages/InfiniteCrypto';
 import { useAuth } from './hooks/useAuth';
 
 function App() {
@@ -15,8 +15,8 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<InfiniteIdeas />} />
-        <Route path="/infinite_ideas" element={<InfiniteIdeas />} />
+        <Route path="/" element={<InfiniteCrypto />} />
+        <Route path="/infinite_ideas" element={<InfiniteCrypto />} />
       </Routes>
     </BrowserRouter>
   );

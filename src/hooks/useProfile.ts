@@ -45,7 +45,7 @@ export function useProfile() {
           setTimeout(() => reject(new Error('Profile fetch timeout')), QUERY_TIMEOUT);
         });
 
-        // Create the fetch promise
+        // Create the fetch promise with case-insensitive search
         const fetchPromise = supabase
           .from('profiles')
           .select('*')
@@ -91,45 +91,10 @@ export function useProfile() {
         // Handle web3 users
         if (params.wallet_address) {
           const normalizedAddress = params.wallet_address.toLowerCase();
-          console.log('Creating/updating profile for address:', normalizedAddress);
+          console.log('Creating profile for address:', normalizedAddress);
           
-          // First try to find existing profile
-          const { data: existingProfile, error: findError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('wallet_address', normalizedAddress)
-            .maybeSingle();
-
-          if (findError) {
-            console.error('Error finding existing profile:', findError);
-            throw findError;
-          }
-
-          // If profile exists, update it
-          if (existingProfile) {
-            console.log('Updating existing profile:', existingProfile.id);
-            const { data, error: updateError } = await supabase
-              .from('profiles')
-              .update({
-                web3_provider: params.web3_provider,
-                chain_id: params.chain_id,
-                last_login: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', existingProfile.id)
-              .select()
-              .single();
-
-            if (updateError) {
-              console.error('Error updating profile:', updateError);
-              throw updateError;
-            }
-            return data;
-          }
-
-          // If no profile exists, create a new one
-          console.log('Creating new profile for address:', normalizedAddress);
-          const { data, error: insertError } = await supabase
+          // Always create a new profile for web3 users
+          const { data, error } = await supabase
             .from('profiles')
             .insert({
               wallet_address: normalizedAddress,
@@ -142,9 +107,9 @@ export function useProfile() {
             .select()
             .single();
 
-          if (insertError) {
-            console.error('Error inserting profile:', insertError);
-            throw insertError;
+          if (error) {
+            console.error('Error creating web3 profile:', error);
+            throw error;
           }
           return data;
         }
@@ -154,18 +119,15 @@ export function useProfile() {
           console.log('Creating/updating web2 profile for user:', params.user_id);
           const { data, error } = await supabase
             .from('profiles')
-            .upsert(
-              {
-                user_id: params.user_id,
-                email: params.email,
-                last_login: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              },
-              {
-                onConflict: 'user_id',
-                ignoreDuplicates: false
-              }
-            )
+            .upsert({
+              user_id: params.user_id,
+              email: params.email,
+              last_login: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'user_id',
+              ignoreDuplicates: false
+            })
             .select()
             .single();
 

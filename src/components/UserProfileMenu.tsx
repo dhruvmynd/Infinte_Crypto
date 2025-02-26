@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, ChevronDown, Book } from 'lucide-react';
+import { LogOut, User, ChevronDown } from 'lucide-react';
 import { useAddress, useDisconnect } from "@thirdweb-dev/react";
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
@@ -30,7 +30,7 @@ export function UserProfileMenu() {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 bg-gray-800/80 hover:bg-gray-700 rounded-lg text-white transition-colors"
+        className="flex items-center gap-2 px-3 py-2 bg-gray-800/80 hover:bg-gray-700 rounded-lg text-white transition-colors -mt-1"
       >
         <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
           <User size={16} className="text-white" />
@@ -48,16 +48,6 @@ export function UserProfileMenu() {
             onClick={() => setIsOpen(false)}
           />
           <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-1 z-20">
-            <a
-              href="https://docs.example.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              <Book size={16} />
-              <span>Documentation</span>
-            </a>
-            <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
             <button
               onClick={handleSignOut}
               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"

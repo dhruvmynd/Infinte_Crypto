@@ -18,6 +18,12 @@ interface ElementListProps {
   walletAddress?: string | null;
   selectedMode: 'Basic' | 'Timed' | 'Category' | '1v1';
   onModeChange: (mode: 'Basic' | 'Timed' | 'Category' | '1v1') => void;
+  onStartChallenge?: () => void;
+  isTimerActive?: boolean;
+  isTimeUp?: boolean;
+  score?: number;
+  totalTargets?: number;
+  onElementClick: (item: DraggableItem) => void;
 }
 
 const LANGUAGE_NAMES: Record<SupportedLanguage, string> = {
@@ -44,41 +50,38 @@ export default function ElementList({
   onDelete,
   walletAddress,
   selectedMode,
-  onModeChange
+  onModeChange,
+  onStartChallenge,
+  isTimerActive,
+  isTimeUp,
+  score,
+  totalTargets,
+  onElementClick
 }: ElementListProps) {
   const [selectedElement, setSelectedElement] = useState<DraggableItem | null>(null);
   const { profile } = useProfile();
   const { user } = useAuth();
   const { calculateRarity } = useRarity();
   const { currentLanguage, setCurrentLanguage, translate } = useLanguage();
-  const [isTimerActive, setIsTimerActive] = useState(false);
-  const [isTimeUp, setIsTimeUp] = useState(false);
 
   const getElementName = (item: DraggableItem) => {
     return item.translations?.[currentLanguage] || item.name;
   };
 
-  const handleStartTimer = () => {
-    setIsTimerActive(true);
-    setIsTimeUp(false);
-  };
-
-  const handleTimeEnd = () => {
-    setIsTimeUp(true);
-    setIsTimerActive(false);
-  };
-
-  const handleDragStart = (e: React.DragEvent, item: DraggableItem) => {
-    if (selectedMode === 'Timed' && (isTimeUp || !isTimerActive)) {
-      e.preventDefault();
-      return;
-    }
-    onDragStart(e, item);
-  };
-
   // Filter elements
   const baseElements = items.filter(item => item.isBaseElement);
-  const generatedElements = items.filter(item => !item.isBaseElement);
+  
+  // Get unique generated elements by name
+  const generatedElements = items.reduce<DraggableItem[]>((acc, item) => {
+    if (!item.isBaseElement && item.combinedFrom?.length >= 2) {
+      // Check if we already have this element name
+      const exists = acc.some(existing => existing.name === item.name);
+      if (!exists) {
+        acc.push(item);
+      }
+    }
+    return acc;
+  }, []);
 
   const filteredBaseElements = baseElements.filter(item => 
     getElementName(item).toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -91,8 +94,9 @@ export default function ElementList({
   );
 
   const handleElementClick = (element: DraggableItem) => {
-    if (deleteMode) return;
+    if (deleteMode || selectedMode === 'Category') return;
     setSelectedElement(selectedElement?.id === element.id ? null : element);
+    onElementClick(element);
   };
 
   const renderRarityIndicator = (name: string) => {
@@ -115,12 +119,14 @@ export default function ElementList({
       className="group relative space-y-1"
     >
       <div
-        className={`flex items-center gap-2 p-2 rounded cursor-move hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800 ${
-          deleteMode || (selectedMode === 'Timed' && (isTimeUp || !isTimerActive)) ? 'pointer-events-none opacity-50' : ''
+        className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800 ${
+          deleteMode || (selectedMode === 'Category' && !isTimerActive) ? 'pointer-events-none opacity-50' : ''
         } ${selectedElement?.id === item.id ? 'ring-2 ring-purple-500' : ''}`}
-        draggable={!deleteMode && !(selectedMode === 'Timed' && (isTimeUp || !isTimerActive))}
-        onDragStart={(e) => handleDragStart(e, item)}
+        draggable={!deleteMode && !(selectedMode === 'Category' && !isTimerActive)}
+        onDragStart={(e) => onDragStart(e, item)}
         onClick={() => handleElementClick(item)}
+        data-item-id={item.id}
+        data-item-name={item.name}
       >
         <span className="text-xl">{typeof item.icon === 'string' ? item.icon : '💫'}</span>
         <span className="flex-1 text-sm truncate">{getElementName(item)}</span>
@@ -149,27 +155,39 @@ export default function ElementList({
         ))}
       </div>
 
-      {/* Timer Section */}
-      {selectedMode === 'Timed' && (
+      {/* Timer/Challenge Section */}
+      {(selectedMode === 'Category' || selectedMode === 'Timed') && (
         <div className="mb-4">
           {!isTimerActive && !isTimeUp ? (
             <button
-              onClick={handleStartTimer}
+              onClick={onStartChallenge}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
             >
               <Play size={16} />
-              <span>Start Timer</span>
+              <span>Start Challenge</span>
             </button>
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
               <TimerComponent
-                initialTime={60}
-                onTimeEnd={handleTimeEnd}
+                initialTime={selectedMode === 'Timed' ? 120 : 60}
+                onTimeEnd={() => {}}
                 isActive={isTimerActive}
               />
+              <div className="text-lg font-medium text-center">
+                Score: {score} {selectedMode === 'Category' && `/ ${totalTargets}`}
+              </div>
               {isTimeUp && (
-                <div className="text-center text-red-500 font-medium">
-                  Time's up! Start a new round to continue.
+                <div className="mt-2">
+                  <div className="text-lg font-medium mb-2 text-center">Time's up!</div>
+                  {selectedMode === 'Timed' && (
+                    <div className="text-sm mb-2 text-center">Words Created: {totalTargets}</div>
+                  )}
+                  <button
+                    onClick={onStartChallenge}
+                    className="w-full px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors"
+                  >
+                    Try Again
+                  </button>
                 </div>
               )}
             </div>
@@ -200,7 +218,7 @@ export default function ElementList({
       </div>
 
       {/* Search Bar */}
-      <div className="relative mb-4 flex-shrink-0">
+      <div className="relative mb-4">
         <input
           type="text"
           placeholder={translate('searchElements')}
@@ -212,7 +230,7 @@ export default function ElementList({
       </div>
 
       {/* Elements Section */}
-      <div className="flex-1 overflow-y-auto min-h-0 space-y-4 pr-1">
+      <div className="flex-1 overflow-y-auto min-h-0 space-y-4">
         {/* Base Elements */}
         <div className="grid grid-cols-2 gap-2">
           {filteredBaseElements.map(item => renderElement(item))}
@@ -238,7 +256,7 @@ export default function ElementList({
               <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mb-1">
                 <ShoppingBag className="w-6 h-6 text-yellow-500" />
               </div>
-              <span className="text-xs text-center">Word Packs</span>
+              <span className="text-xs text center">Word Packs</span>
               <span className="text-xs font-bold">3</span>
             </div>
             

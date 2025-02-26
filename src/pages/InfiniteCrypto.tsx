@@ -1,18 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Volume2, VolumeX, Eraser, Trash2, Sun, Moon } from 'lucide-react';
+import { Volume2, VolumeX, Eraser, Trash2, Sun, Moon, Book } from 'lucide-react';
 import { SoundEffects } from '../sounds';
 import { useCanvas } from '../hooks/useCanvas';
 import { useElementCombiner } from '../hooks/useElementCombiner';
 import { useBackgrounds } from '../hooks/useBackgrounds';
 import ElementList from '../components/ElementList';
 import { AuthHeader } from '../components/AuthHeader';
+import { CategoryMode } from '../components/CategoryMode';
 import { DraggableItem } from '../types';
 import { baseElements, COMBINATION_DISTANCE } from '../constants';
 import { useAddress } from "@thirdweb-dev/react";
 import { useProfile } from '../hooks/useProfile';
 import { useLanguage } from '../hooks/useLanguage';
 
-export default function InfiniteIdeas() {
+function InfiniteCrypto() {
   const [items, setItems] = useState<DraggableItem[]>(baseElements);
   const [draggingItem, setDraggingItem] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -33,6 +34,10 @@ export default function InfiniteIdeas() {
   const soundEffects = useRef<SoundEffects>();
   const { backgrounds, selectedBackground, setSelectedBackground } = useBackgrounds();
   const [selectedMode, setSelectedMode] = useState<'Basic' | 'Timed' | 'Category' | '1v1'>('Basic');
+  const [isTimerActive, setIsTimerActive] = useState(false);
+  const [isTimeUp, setIsTimeUp] = useState(false);
+  const [score, setScore] = useState(0);
+  const [totalGeneratedWords, setTotalGeneratedWords] = useState(0);
 
   const getElementName = (item: DraggableItem) => {
     return item.translations?.[currentLanguage] || item.name;
@@ -52,12 +57,10 @@ export default function InfiniteIdeas() {
     getValidCombination
   } = useElementCombiner();
 
-  // Initialize sound effects
   useEffect(() => {
     soundEffects.current = new SoundEffects();
   }, []);
 
-  // Theme initialization
   useEffect(() => {
     const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
     setIsDark(isDarkMode);
@@ -65,6 +68,20 @@ export default function InfiniteIdeas() {
       document.documentElement.classList.add('dark');
     }
   }, []);
+
+  // Clear non-base elements when switching to Category mode
+  useEffect(() => {
+    if (selectedMode === 'Category' || selectedMode === 'Timed') {
+      setItems(prev => prev.filter(item => item.isBaseElement));
+      setDraggingItem(null);
+      isDraggingRef.current = false;
+      dragStartPositionRef.current = null;
+      setScore(0);
+      setTotalGeneratedWords(0);
+      setIsTimerActive(false);
+      setIsTimeUp(false);
+    }
+  }, [selectedMode]);
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -99,9 +116,44 @@ export default function InfiniteIdeas() {
   };
 
   const sweepBoard = () => {
-    setItems(prev => prev.filter(item => !item.position || item.isBaseElement));
+    setItems(prev => prev.map(item => 
+      item.isBaseElement ? item : { ...item, position: null }
+    ));
     if (soundEnabled && soundEffects.current) {
       soundEffects.current.playDropSound();
+    }
+  };
+
+  const handleStartChallenge = () => {
+    setIsTimerActive(true);
+    setIsTimeUp(false);
+    setScore(0);
+    setTotalGeneratedWords(0);
+    setItems(prev => prev.filter(item => item.isBaseElement));
+  };
+
+  const handleTimeEnd = () => {
+    setIsTimeUp(true);
+    setIsTimerActive(false);
+  };
+
+  // Handle clicking on elements in the list
+  const handleElementClick = (item: DraggableItem) => {
+    if (deleteMode || selectedMode === 'Category') return;
+
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    // Place the element in the center of the visible area
+    const x = rect.width / 2;
+    const y = rect.height / 2;
+
+    if (item.isBaseElement) {
+      const newInstance = createDraggedInstance(item, { x, y });
+      setItems(prev => [...prev, newInstance]);
+      if (soundEnabled) {
+        soundEffects.current?.playDropSound();
+      }
     }
   };
 
@@ -152,10 +204,14 @@ export default function InfiniteIdeas() {
       const now = Date.now();
       const newId = `combined-${now}`;
       
+      // Update items - keep the original elements but remove their positions
       setItems(prev => {
-        const updatedItems = prev.filter(item => 
-          item.id !== element1.id && item.id !== element2.id
-        );
+        const updatedItems = prev.map(item => {
+          if (item.id === element1.id || item.id === element2.id) {
+            return { ...item, position: null };
+          }
+          return item;
+        });
 
         return [
           ...updatedItems,
@@ -171,6 +227,11 @@ export default function InfiniteIdeas() {
           }
         ];
       });
+
+      if (selectedMode === 'Timed' && isTimerActive) {
+        setScore(prev => prev + 1);
+        setTotalGeneratedWords(prev => prev + 1);
+      }
 
       if (soundEnabled && soundEffects.current) {
         soundEffects.current.playCombineSound();
@@ -206,7 +267,7 @@ export default function InfiniteIdeas() {
   };
 
   const handleDrop = (e: React.DragEvent) => {
-    if (deleteMode) return;
+    if (deleteMode || selectedMode === 'Category') return;
     e.preventDefault();
     const itemId = e.dataTransfer.getData('text/plain');
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -251,7 +312,7 @@ export default function InfiniteIdeas() {
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (deleteMode || !isDraggingRef.current || !draggingItem) return;
+    if (deleteMode || !isDraggingRef.current || !draggingItem || selectedMode === 'Category') return;
 
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -269,25 +330,35 @@ export default function InfiniteIdeas() {
   };
 
   const handleMouseUp = (e: React.MouseEvent) => {
-    if (deleteMode) return;
-    if (isDraggingRef.current && draggingItem) {
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
+    if (deleteMode || !isDraggingRef.current || !draggingItem || selectedMode === 'Category') return;
 
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
 
-      const draggedItem = items.find(item => item.id === draggingItem);
-      if (!draggedItem) return;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-      const overlappingElement = findOverlappingElement(x, y, draggingItem);
+    const draggedItem = items.find(item => item.id === draggingItem);
+    if (!draggedItem) return;
 
-      if (overlappingElement) {
-        if (soundEnabled) {
-          soundEffects.current?.playCombineSound();
-        }
-        combineElements(draggedItem, overlappingElement);
+    const overlappingElement = findOverlappingElement(x, y, draggingItem);
+
+    if (overlappingElement) {
+      if (soundEnabled) {
+        soundEffects.current?.playCombineSound();
       }
+      combineElements(draggedItem, overlappingElement);
+    } else {
+      if (soundEnabled) {
+        soundEffects.current?.playDropSound();
+      }
+      setItems(prev => 
+        prev.map(item => 
+          item.id === draggingItem 
+            ? { ...item, position: { x, y }, connectedPoints: [] }
+            : item
+        )
+      );
     }
 
     setDraggingItem(null);
@@ -296,6 +367,8 @@ export default function InfiniteIdeas() {
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (selectedMode === 'Category') return;
+
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -307,7 +380,7 @@ export default function InfiniteIdeas() {
         if (!item.position || item.isBaseElement) return false;
         const dx = x - item.position.x;
         const dy = y - item.position.y;
-        return Math.sqrt(dx * dx + dy * dy) < 30;
+        return Math.sqrt(dx * dx + dy * dy) < COMBINATION_DISTANCE;
       });
 
       if (clickedItem) {
@@ -319,7 +392,7 @@ export default function InfiniteIdeas() {
         if (!item.position) return false;
         const dx = x - item.position.x;
         const dy = y - item.position.y;
-        return Math.sqrt(dx * dx + dy * dy) < 30;
+        return Math.sqrt(dx * dx + dy * dy) < COMBINATION_DISTANCE;
       });
 
       if (clickedItem) {
@@ -336,11 +409,24 @@ export default function InfiniteIdeas() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white transition-colors duration-200">
       <div className="w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between h-16 px-4">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 bg-clip-text text-transparent">
+        <div className="flex items-center h-16">
+          <h1 className="text-xl font-bold bg-gradient-to-r from-purple-500 via-blue-500 to-green-500 bg-clip-text text-transparent pl-4">
             Infinite Ideas
           </h1>
-          <AuthHeader />
+          <div className="flex-1 flex items-center justify-center">
+            <a
+              href="https://jays-personal-organization-1.gitbook.io/infinite-ideas"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-colors text-sm"
+            >
+              <Book size={16} />
+              <span>Documentation</span>
+            </a>
+          </div>
+          <div className="pr-4">
+            <AuthHeader />
+          </div>
         </div>
       </div>
 
@@ -365,12 +451,23 @@ export default function InfiniteIdeas() {
                 deleteMode ? 'cursor-pointer' : 'cursor-default'
               }`}
               onDrop={handleDrop}
-              onDragOver={(e) => e.preventDefault()}
+              onDragOver={(e) => selectedMode !== 'Category' && e.preventDefault()}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseDown={handleMouseDown}
               onMouseLeave={handleMouseUp}
             />
+
+            {selectedMode === 'Category' && (
+              <CategoryMode 
+                containerRef={containerRef}
+                onDrop={() => {}}
+                isTimerActive={isTimerActive}
+                isTimeUp={isTimeUp}
+                onScoreChange={setScore}
+              />
+            )}
+
             {combining && combiningPosition && (
               <div 
                 className="combining-animation"
@@ -381,6 +478,7 @@ export default function InfiniteIdeas() {
                 }}
               />
             )}
+
             <div className="absolute bottom-4 right-4 flex gap-2">
               <button
                 onClick={toggleDeleteMode}
@@ -422,6 +520,12 @@ export default function InfiniteIdeas() {
             walletAddress={address}
             selectedMode={selectedMode}
             onModeChange={setSelectedMode}
+            onStartChallenge={handleStartChallenge}
+            isTimerActive={isTimerActive}
+            isTimeUp={isTimeUp}
+            score={score}
+            totalTargets={totalGeneratedWords}
+            onElementClick={handleElementClick}
           />
         </div>
       </div>
@@ -429,4 +533,4 @@ export default function InfiniteIdeas() {
   );
 }
 
-export { InfiniteIdeas }
+export default InfiniteCrypto;
