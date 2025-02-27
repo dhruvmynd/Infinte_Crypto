@@ -1,5 +1,11 @@
-import React from 'react';
-import { X, CreditCard, Package, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, CreditCard, Package, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
+import { useStripeCheckout, WORD_PACKS, TOKEN_PACKAGES } from '../lib/stripe';
+import { Toast } from './Toast';
+import { useAuth } from '../hooks/useAuth';
+import { useAddress } from "@thirdweb-dev/react";
+import { useProfile } from '../hooks/useProfile';
+import { checkSupabaseConnection, handleDatabaseError } from '../lib/supabase';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -7,71 +13,70 @@ interface CheckoutModalProps {
   type: 'words' | 'tokens';
 }
 
-interface PackageOption {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  amount: number;
-}
-
-const WORD_PACKAGES: PackageOption[] = [
-  {
-    id: 'basic',
-    name: 'Basic Pack',
-    description: 'Get started with 10 new word combinations',
-    price: 4.99,
-    amount: 10
-  },
-  {
-    id: 'pro',
-    name: 'Pro Pack',
-    description: 'Unlock 25 new word combinations',
-    price: 9.99,
-    amount: 25
-  },
-  {
-    id: 'ultimate',
-    name: 'Ultimate Pack',
-    description: 'Master the game with 50 new combinations',
-    price: 19.99,
-    amount: 50
-  }
-];
-
-const TOKEN_PACKAGES: PackageOption[] = [
-  {
-    id: 'starter',
-    name: 'Starter Tokens',
-    description: '100 tokens to unlock hints and power-ups',
-    price: 4.99,
-    amount: 100
-  },
-  {
-    id: 'plus',
-    name: 'Plus Tokens',
-    description: '250 tokens with 10% bonus',
-    price: 9.99,
-    amount: 275
-  },
-  {
-    id: 'premium',
-    name: 'Premium Tokens',
-    description: '500 tokens with 20% bonus',
-    price: 19.99,
-    amount: 600
-  }
-];
-
 export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
+  const { checkout } = useStripeCheckout();
+  const { user } = useAuth();
+  const address = useAddress();
+  const { profile, isLoading: profileLoading } = useProfile();
+  
+  useEffect(() => {
+    // Reset state when modal opens
+    if (isOpen) {
+      setSelectedPackage(null);
+      setError(null);
+    }
+  }, [isOpen]);
+  
   if (!isOpen) return null;
 
-  const packages = type === 'words' ? WORD_PACKAGES : TOKEN_PACKAGES;
+  const packages = type === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
   const icon = type === 'words' ? Package : Sparkles;
 
-  const handleCheckout = (packageId: string) => {
-    // This is where you would integrate with Stripe
-    console.log(`Checkout for package: ${packageId}`);
+  const isLoggedIn = !!user || !!address;
+  const hasProfile = !!profile?.id;
+
+  const handleCheckout = async (packageId: string) => {
+    if (!isLoggedIn) {
+      setError('You must be logged in to make a purchase');
+      return;
+    }
+
+    if (profileLoading) {
+      setError('Your profile is still loading. Please try again in a moment.');
+      return;
+    }
+
+    if (!hasProfile && address) {
+      setError('Your Web3 profile is being created. Please try again in a moment.');
+      return;
+    }
+
+    setSelectedPackage(packageId);
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Check Supabase connection first
+      const { connected, error: connectionError } = await checkSupabaseConnection();
+      if (!connected) {
+        throw new Error(connectionError?.message || 'Database connection issue. Please try again.');
+      }
+      
+      await checkout(packageId, type);
+    } catch (err) {
+      const errorMessage = err instanceof Error 
+        ? handleDatabaseError(err, err.message)
+        : 'An error occurred during checkout';
+      
+      setError(errorMessage);
+      console.error('Checkout error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -80,13 +85,28 @@ export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          disabled={loading}
         >
           <X size={20} />
         </button>
 
-        <h2 className="text-2xl font-bold mb-6">
+        <h2 className="text-2xl font-bold mb-6" id="checkout-dialog-title">
           {type === 'words' ? 'Buy Word Packs' : 'Get Tokens'}
         </h2>
+
+        {!isLoggedIn && (
+          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
+            <AlertCircle size={20} className="text-red-500 dark:text-red-400 shrink-0" />
+            <p className="text-sm text-red-600 dark:text-red-400">User must be logged in to make a purchase</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
+            <AlertCircle size={20} className="text-red-500 dark:text-red-400 shrink-0" />
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          </div>
+        )}
 
         <div className="space-y-4">
           {packages.map((pkg) => (
@@ -109,10 +129,15 @@ export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
                     <span className="text-lg font-bold">${pkg.price}</span>
                     <button
                       onClick={() => handleCheckout(pkg.id)}
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-colors text-sm"
+                      disabled={loading || !isLoggedIn}
+                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <CreditCard size={16} />
-                      <span>Buy Now</span>
+                      {loading && selectedPackage === pkg.id ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <CreditCard size={16} />
+                      )}
+                      <span>{loading && selectedPackage === pkg.id ? 'Processing...' : 'Buy Now'}</span>
                     </button>
                   </div>
                 </div>
@@ -121,10 +146,25 @@ export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
           ))}
         </div>
 
-        <p className="mt-6 text-sm text-gray-500 dark:text-gray-400 text-center">
-          Secure payment powered by Stripe
-        </p>
+        <div className="mt-6 flex items-center justify-center gap-2">
+          <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 12H20M20 12L16 8M20 12L16 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Secure payment powered by Stripe
+          </p>
+        </div>
       </div>
+
+      {loading && (
+        <Toast
+          message="Processing your purchase..."
+          type="loading"
+          onClose={() => {}}
+        />
+      )}
     </div>
   );
 }

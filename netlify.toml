@@ -1,0 +1,62 @@
+# Netlify configuration file
+
+# Build settings
+[build]
+  # Directory to publish (output of the build)
+  publish = "dist"
+  # Build command
+  command = "npm run build"
+  # Functions directory
+  functions = "netlify/functions"
+
+# Redirects and rewrites
+[[redirects]]
+  # Redirect all API requests to the serverless function
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+# Add direct access to health check endpoints
+[[redirects]]
+  from = "/health"
+  to = "/.netlify/functions/api/health"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/create-checkout-session"
+  to = "/.netlify/functions/api/create-checkout-session"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/verify-purchase/*"
+  to = "/.netlify/functions/api/verify-purchase/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/webhook"
+  to = "/.netlify/functions/api/webhook"
+  status = 200
+  force = true
+
+# SPA fallback - this should be the last redirect
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers to ensure proper content types for API responses
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Content-Type = "application/json"
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+# Build plugin settings
+[build.environment]
+  NODE_OPTIONS = "--max_old_space_size=4096"

@@ -1,1 +1,9 @@
-/* /index.html 200
+# Netlify redirects file
+/api/*  /.netlify/functions/api/:splat  200
+/health  /.netlify/functions/api/health  200
+/create-checkout-session  /.netlify/functions/api/create-checkout-session  200
+/verify-purchase/*  /.netlify/functions/api/verify-purchase/:splat  200
+/webhook  /.netlify/functions/api/webhook  200
+
+# SPA fallback
+/*  /index.html  200

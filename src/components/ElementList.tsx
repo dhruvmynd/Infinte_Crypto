@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Search, X, Play, Timer, ShoppingBag, Lightbulb, Sparkles, Clock, Target, Users, Gamepad2 } from 'lucide-react';
+import { Search, X, Play, Timer, ShoppingBag, Lightbulb, Sparkles, Clock, Target, Users, Gamepad2, Loader2 } from 'lucide-react';
 import { DraggableItem } from '../types';
 import { useProfile } from '../hooks/useProfile';
 import { useAuth } from '../hooks/useAuth';
 import { useRarity } from '../hooks/useRarity';
 import { useLanguage } from '../hooks/useLanguage';
+import { usePurchases } from '../hooks/usePurchases';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from '../constants';
 import { Timer as TimerComponent } from './Timer';
 
@@ -24,6 +25,8 @@ interface ElementListProps {
   score?: number;
   totalTargets?: number;
   onElementClick: (item: DraggableItem) => void;
+  onBuyWords: () => void;
+  onGetTokens: () => void;
 }
 
 const LANGUAGE_NAMES: Record<SupportedLanguage, string> = {
@@ -56,13 +59,16 @@ export default function ElementList({
   isTimeUp,
   score,
   totalTargets,
-  onElementClick
+  onElementClick,
+  onBuyWords,
+  onGetTokens
 }: ElementListProps) {
   const [selectedElement, setSelectedElement] = useState<DraggableItem | null>(null);
   const { profile } = useProfile();
   const { user } = useAuth();
   const { calculateRarity } = useRarity();
   const { currentLanguage, setCurrentLanguage, translate } = useLanguage();
+  const { totals } = usePurchases();
 
   const getElementName = (item: DraggableItem) => {
     return item.translations?.[currentLanguage] || item.name;
@@ -119,7 +125,7 @@ export default function ElementList({
       className="group relative space-y-1"
     >
       <div
-        className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800 ${
+        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800 ${
           deleteMode || (selectedMode === 'Category' && !isTimerActive) ? 'pointer-events-none opacity-50' : ''
         } ${selectedElement?.id === item.id ? 'ring-2 ring-purple-500' : ''}`}
         draggable={!deleteMode && !(selectedMode === 'Category' && !isTimerActive)}
@@ -128,8 +134,8 @@ export default function ElementList({
         data-item-id={item.id}
         data-item-name={item.name}
       >
-        <span className="text-xl">{typeof item.icon === 'string' ? item.icon : '💫'}</span>
-        <span className="flex-1 text-sm truncate">{getElementName(item)}</span>
+        <span className="text-xl min-w-[28px] flex justify-center">{typeof item.icon === 'string' ? item.icon : '💫'}</span>
+        <span className="flex-1 text-sm font-medium truncate">{getElementName(item)}</span>
         {!item.isBaseElement && renderRarityIndicator(item.name)}
       </div>
     </div>
@@ -232,14 +238,20 @@ export default function ElementList({
       {/* Elements Section */}
       <div className="flex-1 overflow-y-auto min-h-0 space-y-4">
         {/* Base Elements */}
-        <div className="grid grid-cols-2 gap-2">
-          {filteredBaseElements.map(item => renderElement(item))}
+        <div>
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 px-1">Base Elements</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {filteredBaseElements.map(item => renderElement(item))}
+          </div>
         </div>
 
         {/* Generated Elements */}
         {filteredGeneratedElements.length > 0 && (
-          <div className="grid grid-cols-2 gap-2">
-            {filteredGeneratedElements.map(item => renderElement(item))}
+          <div>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 px-1">Generated Elements</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {filteredGeneratedElements.map(item => renderElement(item))}
+            </div>
           </div>
         )}
 
@@ -257,7 +269,13 @@ export default function ElementList({
                 <ShoppingBag className="w-6 h-6 text-yellow-500" />
               </div>
               <span className="text-xs text center">Word Packs</span>
-              <span className="text-xs font-bold">3</span>
+              <span className="text-xs font-bold">
+                {totals.isLoading ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  totals.words
+                )}
+              </span>
             </div>
             
             <div className="flex flex-col items-center">
@@ -280,8 +298,14 @@ export default function ElementList({
               <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-full flex items-center justify-center mb-1">
                 <Sparkles className="w-6 h-6 text-pink-500" />
               </div>
-              <span className="text-xs text-center">Wild</span>
-              <span className="text-xs font-bold">1</span>
+              <span className="text-xs text-center">Tokens</span>
+              <span className="text-xs font-bold">
+                {totals.isLoading ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  totals.tokens
+                )}
+              </span>
             </div>
           </div>
 
@@ -297,11 +321,13 @@ export default function ElementList({
 
           <div className="flex gap-2">
             <button
+              onClick={onBuyWords}
               className="flex-1 bg-blue-500 hover:bg-blue-600 text-white rounded-lg py-2 text-sm font-medium transition-colors"
             >
               Buy Words
             </button>
             <button
+              onClick={onGetTokens}
               className="flex-1 bg-purple-500 hover:bg-purple-600 text-white rounded-lg py-2 text-sm font-medium transition-colors"
             >
               Get Tokens

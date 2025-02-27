@@ -14,23 +14,48 @@ export function useActivity() {
 
   const { mutate: trackActivity } = useMutation({
     mutationFn: async (activity: Activity) => {
-      if (!address) throw new Error('No wallet address found');
-      if (!profile?.id) throw new Error('No profile found');
+      try {
+        // Skip activity tracking if no profile is available
+        if (!profile?.id) {
+          console.log('Activity tracking skipped - no profile found');
+          return null;
+        }
 
-      const { data, error } = await supabase
-        .from('user_activities')
-        .insert([{
-          user_id: profile.id,
-          activity_type: activity.activity_type,
-          details: activity.details || {}
-        }])
-        .select()
-        .single();
+        const { data, error } = await supabase
+          .from('user_activities')
+          .insert([{
+            user_id: profile.id,
+            activity_type: activity.activity_type,
+            details: activity.details || {}
+          }])
+          .select()
+          .single();
 
-      if (error) throw error;
-      return data;
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        console.log('Activity tracking error:', error);
+        // Return null instead of throwing to prevent errors from propagating
+        return null;
+      }
+    },
+    // Disable retries to prevent multiple attempts that might fail
+    retry: false,
+    // Don't throw on error to prevent breaking the app flow
+    onError: (error) => {
+      console.log('Activity tracking mutation error (handled):', error);
     }
   });
 
-  return { trackActivity };
+  return { 
+    trackActivity: (activity: Activity) => {
+      // Only attempt to track if we have a profile
+      if (profile?.id) {
+        return trackActivity(activity);
+      } else {
+        console.log('Activity tracking skipped - no profile');
+        return Promise.resolve(null);
+      }
+    }
+  };
 }

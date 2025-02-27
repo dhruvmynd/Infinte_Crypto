@@ -62,9 +62,10 @@ export function useCanvas(
     const translatedName = getElementName(item);
     const textMetrics = ctx.measureText(translatedName);
     const textWidth = textMetrics.width;
-    const padding = 20;
-    const bgWidth = textWidth + (padding * 2);
-    const bgHeight = 30;
+    const padding = 30; // Increased padding
+    const iconPadding = 30; // Space for icon
+    const bgWidth = textWidth + padding + iconPadding;
+    const bgHeight = 36; // Increased height
 
     // Draw background
     ctx.fillStyle = isDarkMode ? 'rgba(30, 30, 30, 0.9)' : 'rgba(255, 255, 255, 0.9)';
@@ -74,13 +75,30 @@ export function useCanvas(
       item.position.y - (bgHeight / 2), 
       bgWidth, 
       bgHeight, 
-      15
+      18 // Increased border radius
     );
     ctx.fill();
 
+    // Add subtle border
+    ctx.strokeStyle = isDarkMode ? 'rgba(80, 80, 80, 0.4)' : 'rgba(200, 200, 200, 0.6)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Draw emoji if available
+    if (item.icon) {
+      ctx.font = '18px Arial'; // Larger emoji
+      ctx.fillStyle = isDarkMode ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)';
+      ctx.fillText(
+        typeof item.icon === 'string' ? item.icon : '💫', 
+        item.position.x - (textWidth / 2) - 10, 
+        item.position.y
+      );
+    }
+
     // Draw text
+    ctx.font = '14px Arial';
     ctx.fillStyle = isDarkMode ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)';
-    ctx.fillText(translatedName, item.position.x, item.position.y);
+    ctx.fillText(translatedName, item.position.x + 10, item.position.y); // Shifted text to the right
   };
 
   useEffect(() => {

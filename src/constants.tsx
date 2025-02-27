@@ -2,7 +2,7 @@ import Groq from 'groq-sdk';
 import { DraggableItem } from './types';
 
 export const RATE_LIMIT_WINDOW = 60000; // 1 minute in milliseconds
-export const MAX_REQUESTS = 25; // Keep some buffer below the 30 RPM limit
+export const MAX_REQUESTS = 10; // Keep some buffer below the 30 RPM limit
 export const COMBINATION_COOLDOWN = 2000; // 2 seconds cooldown between combinations
 export const COMBINATION_DISTANCE = 40; // Distance threshold for combining elements
 export const MAX_RETRIES = 5;
@@ -159,6 +159,60 @@ export const baseElements: DraggableItem[] = [
   }
 ];
 
+// Predefined emoji mappings for common words
+const EMOJI_MAPPINGS: Record<string, string> = {
+  // Nature elements
+  'Water': '💧', 'Fire': '🔥', 'Earth': '🌍', 'Air': '💨', 'Wind': '🌬️',
+  'Ice': '❄️', 'Snow': '❄️', 'Rain': '🌧️', 'Cloud': '☁️', 'Storm': '⛈️',
+  'Lightning': '⚡', 'Thunder': '🌩️', 'Tornado': '🌪️', 'Hurricane': '🌀',
+  'Volcano': '🌋', 'Lava': '🌋', 'Magma': '🌋', 'Rock': '🪨', 'Stone': '🪨',
+  'Mountain': '⛰️', 'Hill': '🏔️', 'Valley': '🏞️', 'Canyon': '🏞️',
+  'Forest': '🌲', 'Tree': '🌳', 'Plant': '🌱', 'Flower': '🌸', 'Grass': '🌿',
+  'Ocean': '🌊', 'Sea': '🌊', 'Lake': '🏞️', 'River': '🏞️', 'Stream': '💦',
+  'Desert': '🏜️', 'Beach': '🏖️', 'Island': '🏝️', 'Reef': '🐠',
+  
+  // Crypto/Tech elements
+  'Bitcoin': '₿', 'Crypto': '₿', 'Blockchain': '🔗', 'Token': '🪙',
+  'Digital': '💻', 'Computer': '💻', 'Network': '🌐', 'Internet': '🌐',
+  'Code': '👨‍💻', 'Program': '👨‍💻', 'Algorithm': '🧮', 'Data': '📊',
+  'Cyber': '🤖', 'Robot': '🤖', 'AI': '🧠', 'Machine': '⚙️',
+  'Mining': '⛏️', 'Hash': '#️⃣', 'Wallet': '👛', 'Key': '🔑',
+  
+  // Combined elements
+  'Steam': '💨', 'Mud': '💧', 'Plasma': '⚡', 'Dust': '💨',
+  'Ash': '🔥', 'Smoke': '💨', 'Fog': '🌫️', 'Mist': '🌫️',
+  'Swamp': '🌿', 'Oasis': '🏝️', 'Glacier': '❄️', 'Iceberg': '❄️',
+  'Geyser': '💦', 'Waterfall': '🏞️', 'Tsunami': '🌊', 'Wave': '🌊',
+  'Earthquake': '🌋', 'Landslide': '🏔️', 'Avalanche': '❄️',
+  'Cryptomine': '⛏️', 'Dataflow': '📊', 'Firewall': '🔥', 'Cyberspace': '🌐',
+  'Bitstream': '💧₿', 'Blockchain': '🔗', 'Cryptokey': '🔑', 'Datacloud': '☁️',
+  'Webflow': '🌊', 'Netstream': '💧', 'Codefire': '🔥', 'Techearth': '🌍',
+  
+  // Mythological/Fantasy
+  'Dragon': '🐉', 'Phoenix': '🔥', 'Unicorn': '🦄', 'Mermaid': '🧜‍♀️',
+  'Wizard': '🧙‍♂️', 'Magic': '✨', 'Spell': '🪄', 'Potion': '🧪',
+  'Fairy': '🧚', 'Elf': '🧝', 'Dwarf': '👨‍🦰', 'Giant': '🏔️',
+  'Ghost': '👻', 'Spirit': '👻', 'Soul': '✨', 'Angel': '👼',
+  'Demon': '👿', 'Devil': '😈', 'God': '👑', 'Goddess': '👑',
+  
+  // Space/Cosmic
+  'Star': '⭐', 'Planet': '🪐', 'Moon': '🌙', 'Sun': '☀️',
+  'Galaxy': '🌌', 'Universe': '🌌', 'Cosmos': '🌌', 'Nebula': '🌌',
+  'Comet': '☄️', 'Asteroid': '☄️', 'Meteor': '☄️', 'Black Hole': '⚫',
+  'Supernova': '💥', 'Stardust': '✨', 'Orbit': '🔄', 'Gravity': '🧲',
+  
+  // Abstract concepts
+  'Time': '⏰', 'Space': '🌌', 'Energy': '⚡', 'Power': '💪',
+  'Life': '🌱', 'Death': '💀', 'Mind': '🧠', 'Soul': '✨',
+  'Love': '❤️', 'Hate': '💔', 'Peace': '☮️', 'War': '⚔️',
+  'Light': '💡', 'Dark': '🌑', 'Sound': '🔊', 'Silence': '🔇',
+  'Truth': '✓', 'Lie': '❌', 'Dream': '💭', 'Nightmare': '👹',
+  
+  // Fallbacks for common combinations
+  'Blend': '🔄', 'Fusion': '🔄', 'Hybrid': '🔄', 'Mix': '🔄',
+  'Combo': '🔄', 'Merge': '🔄', 'Alloy': '🔄', 'Compound': '🔄'
+};
+
 // Cache for generated translations and emojis
 const translationCache: Record<string, Record<SupportedLanguage, string>> = {};
 const emojiCache: Record<string, string> = {};
@@ -193,13 +247,21 @@ export async function getTranslationsForWord(word: string): Promise<Record<Suppo
           content: `Translate: ${word}`
         }
       ],
-      model: 'llama-3.3-70b-versatile',
+      model: 'llama-3.1-8b-instant',
       temperature: 0.3,
       stream: false
     });
 
     const translationsStr = completion.choices[0]?.message?.content?.trim() || '{}';
-    const translations = JSON.parse(translationsStr) as Partial<Record<SupportedLanguage, string>>;
+    
+    // Handle potential JSON parsing errors
+    let translations: Partial<Record<SupportedLanguage, string>> = {};
+    try {
+      translations = JSON.parse(translationsStr) as Partial<Record<SupportedLanguage, string>>;
+    } catch (error) {
+      console.log('Error parsing translations JSON:', error);
+      // Continue with empty translations object
+    }
     
     // Ensure all languages are present
     const fullTranslations: Record<SupportedLanguage, string> = {
@@ -215,7 +277,7 @@ export async function getTranslationsForWord(word: string): Promise<Record<Suppo
     
     return fullTranslations;
   } catch (error) {
-    console.error('Error generating translations:', error);
+    console.log('Error generating translations:', error);
     // Return original word for all languages if translation fails
     return {
       en: word,
@@ -231,6 +293,12 @@ export async function getEmojiForCombination(word: string): Promise<string> {
   // Return cached emoji if available
   if (emojiCache[word]) {
     return emojiCache[word];
+  }
+
+  // Check predefined mappings first
+  if (EMOJI_MAPPINGS[word]) {
+    emojiCache[word] = EMOJI_MAPPINGS[word];
+    return EMOJI_MAPPINGS[word];
   }
 
   try {
@@ -252,7 +320,7 @@ export async function getEmojiForCombination(word: string): Promise<string> {
           content: `Select ONE emoji that best represents: ${word}`
         }
       ],
-      model: 'llama-3.3-70b-versatile',
+      model: 'llama-3.1-8b-instant',
       temperature: 0.3,
       max_tokens: 1,
       top_p: 1,
@@ -266,7 +334,7 @@ export async function getEmojiForCombination(word: string): Promise<string> {
     
     return emoji;
   } catch (error) {
-    console.error('Error generating emoji:', error);
+    console.log('Error generating emoji:', error);
     return '💫'; // Fallback to sparkles if generation fails
   }
 }

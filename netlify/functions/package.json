@@ -1,0 +1,12 @@
+{
+  "name": "infinite-ideas-api",
+  "version": "1.0.0",
+  "description": "API for Infinite Ideas application",
+  "main": "api.js",
+  "dependencies": {
+    "express": "^4.18.3",
+    "serverless-http": "^3.2.0",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2"
+  }
+}

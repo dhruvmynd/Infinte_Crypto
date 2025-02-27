@@ -5,6 +5,7 @@ import { Wallet } from 'lucide-react';
 import { useProfile } from '../hooks/useProfile';
 import { useActivity } from '../hooks/useActivity';
 import { Toast } from './Toast';
+import { checkSupabaseConnection, handleDatabaseError } from '../lib/supabase';
 
 export function ThirdWebAuth() {
   const address = useAddress();
@@ -35,22 +36,46 @@ export function ThirdWebAuth() {
             type: 'loading'
           });
 
+          // Check Supabase connection first
+          const { connected, error: connectionError } = await checkSupabaseConnection();
+          if (!connected) {
+            const errorMessage = connectionError 
+              ? handleDatabaseError(connectionError, 'Database connection issue')
+              : 'Database connection issue. Please try again.';
+              
+            setToast({
+              message: errorMessage,
+              type: 'error'
+            });
+            setIsCreatingProfile(false);
+            return;
+          }
+
           const normalizedAddress = address.toLowerCase();
+          console.log('Creating profile for wallet address:', normalizedAddress);
           
           // Create or update profile with just the wallet address
-          await createProfile({
+          const profile = await createProfile({
             wallet_address: normalizedAddress,
-            web3_provider: 'thirdweb'
+            web3_provider: 'thirdweb',
+            email: null // Explicitly set email to null for Web3 users
           });
 
+          console.log('Web3 profile created/updated:', profile);
+
           // Track the connection activity
-          await trackActivity({
-            activity_type: 'wallet_connected',
-            details: {
-              provider: 'thirdweb',
-              wallet_address: normalizedAddress
-            }
-          });
+          try {
+            await trackActivity({
+              activity_type: 'wallet_connected',
+              details: {
+                provider: 'thirdweb',
+                wallet_address: normalizedAddress
+              }
+            });
+          } catch (activityError) {
+            console.log('Activity tracking error (non-critical):', activityError);
+            // Continue execution even if activity tracking fails
+          }
 
           setToast({
             message: 'Connected successfully!',
@@ -58,14 +83,17 @@ export function ThirdWebAuth() {
           });
 
           setTimeout(() => {
-            navigate('/infinite_crypto');
+            navigate('/infinite_ideas');
           }, 1000);
         } catch (err) {
           console.error('Error creating web3 profile:', err);
+          
+          const errorMessage = err instanceof Error 
+            ? handleDatabaseError(err, `Failed to connect: ${err.message}`)
+            : 'Failed to connect wallet';
+            
           setToast({
-            message: err instanceof Error 
-              ? `Failed to connect: ${err.message}`
-              : 'Failed to connect wallet',
+            message: errorMessage,
             type: 'error'
           });
         } finally {

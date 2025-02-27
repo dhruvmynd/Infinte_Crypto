@@ -7,6 +7,7 @@ import { useBackgrounds } from '../hooks/useBackgrounds';
 import ElementList from '../components/ElementList';
 import { AuthHeader } from '../components/AuthHeader';
 import { CategoryMode } from '../components/CategoryMode';
+import { CheckoutModal } from '../components/CheckoutModal';
 import { DraggableItem } from '../types';
 import { baseElements, COMBINATION_DISTANCE } from '../constants';
 import { useAddress } from "@thirdweb-dev/react";
@@ -25,6 +26,8 @@ function InfiniteCrypto() {
     }
     return false;
   });
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [checkoutType, setCheckoutType] = useState<'words' | 'tokens'>('words');
   
   const address = useAddress();
   const { profile } = useProfile();
@@ -199,7 +202,7 @@ function InfiniteCrypto() {
     }
 
     try {
-      const { word: newElement, emoji, translations } = await getValidCombination(element1.name, element2.name);
+      const { word: newElement, emoji, translations, rarity, domain } = await getValidCombination(element1.name, element2.name);
       
       const now = Date.now();
       const newId = `combined-${now}`;
@@ -223,7 +226,9 @@ function InfiniteCrypto() {
             position: element1.position,
             connectedPoints: [],
             lastCombined: now,
-            combinedFrom: [...(element1.combinedFrom || [element1.name]), ...(element2.combinedFrom || [element2.name])]
+            combinedFrom: [...(element1.combinedFrom || [element1.name]), ...(element2.combinedFrom || [element2.name])],
+            rarity,
+            domain
           }
         ];
       });
@@ -406,6 +411,16 @@ function InfiniteCrypto() {
     }
   };
 
+  const handleBuyWords = () => {
+    setCheckoutType('words');
+    setIsCheckoutOpen(true);
+  };
+
+  const handleGetTokens = () => {
+    setCheckoutType('tokens');
+    setIsCheckoutOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white transition-colors duration-200">
       <div className="w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
@@ -479,7 +494,7 @@ function InfiniteCrypto() {
               />
             )}
 
-            <div className="absolute bottom-4 right-4 flex gap-2">
+            <div className="absolute bottom-4 left-4 flex gap-2">
               <button
                 onClick={toggleDeleteMode}
                 className={`p-2 rounded-full transition-colors ${
@@ -526,9 +541,17 @@ function InfiniteCrypto() {
             score={score}
             totalTargets={totalGeneratedWords}
             onElementClick={handleElementClick}
+            onBuyWords={handleBuyWords}
+            onGetTokens={handleGetTokens}
           />
         </div>
       </div>
+      
+      <CheckoutModal 
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        type={checkoutType}
+      />
     </div>
   );
 }

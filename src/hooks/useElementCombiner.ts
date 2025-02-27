@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import Groq from 'groq-sdk';
-import { DraggableItem } from '../types';
+import { DraggableItem, Rarity } from '../types';
 import { supabase } from '../lib/supabase';
 import { useActivity } from './useActivity';
 import { 
@@ -20,86 +20,203 @@ const groq = new Groq({
 const requestTimes: number[] = [];
 
 // Instant combinations for common element pairs
-const INSTANT_COMBINATIONS: Record<string, Record<string, { word: string; translations: Record<SupportedLanguage, string> }>> = {
+const INSTANT_COMBINATIONS: Record<string, Record<string, { word: string; emoji: string; translations: Record<SupportedLanguage, string> }>> = {
   'Water': {
     'Fire': {
-      word: 'Steamforge',
+      word: 'Steam',
+      emoji: '💨',
       translations: {
-        en: 'Steamforge',
-        es: 'Forjavapor',
-        fr: 'Forgevapeur',
-        de: 'Dampfschmiede',
-        zh: '蒸汽锻造'
+        en: 'Steam',
+        es: 'Vapor',
+        fr: 'Vapeur',
+        de: 'Dampf',
+        zh: '蒸汽'
       }
     },
     'Earth': {
-      word: 'Mudweaver',
+      word: 'Mud',
+      emoji: '💧',
       translations: {
-        en: 'Mudweaver',
-        es: 'Tejelodo',
-        fr: 'Tisseboue',
-        de: 'Schlammweber',
-        zh: '泥土编织'
+        en: 'Mud',
+        es: 'Lodo',
+        fr: 'Boue',
+        de: 'Schlamm',
+        zh: '泥'
       }
     },
     'Bitcoin': {
-      word: 'Cryptoflow',
+      word: 'Liquidcoin',
+      emoji: '💧₿',
       translations: {
-        en: 'Cryptoflow',
-        es: 'Criptoflux',
-        fr: 'Cryptoflux',
-        de: 'Kryptofluss',
-        zh: '加密流'
+        en: 'Liquidcoin',
+        es: 'Monedalíquida',
+        fr: 'Liquidecoin',
+        de: 'Flüssigmünze',
+        zh: '流动币'
       }
     }
   },
   'Fire': {
     'Earth': {
-      word: 'Magmacore',
+      word: 'Magma',
+      emoji: '🌋',
       translations: {
-        en: 'Magmacore',
-        es: 'Nucleomagma',
-        fr: 'Coeurmagma',
-        de: 'Magmakern',
-        zh: '岩浆核心'
+        en: 'Magma',
+        es: 'Magma',
+        fr: 'Magma',
+        de: 'Magma',
+        zh: '岩浆'
       }
     },
     'Bitcoin': {
-      word: 'Blazecoin',
+      word: 'Burnchain',
+      emoji: '🔥₿',
       translations: {
-        en: 'Blazecoin',
-        es: 'Llamacoin',
-        fr: 'Braisecoin',
-        de: 'Flammenmünze',
-        zh: '烈焰币'
+        en: 'Burnchain',
+        es: 'Quemacadena',
+        fr: 'Brûlechain',
+        de: 'Brennkette',
+        zh: '燃烧链'
       }
     }
   },
   'Earth': {
     'Bitcoin': {
-      word: 'Geominer',
+      word: 'Digicoin',
+      emoji: '⛏️',
       translations: {
-        en: 'Geominer',
-        es: 'Geominero',
-        fr: 'Géomineur',
-        de: 'Geoschürfer',
-        zh: '地矿者'
+        en: 'Digicoin',
+        es: 'Excavacoin',
+        fr: 'Creusecoin',
+        de: 'Grabmünze',
+        zh: '挖掘币'
       }
     }
   }
 };
 
-// Word patterns for fallback generation
-const PATTERNS = [
-  { prefix: 'crypto', suffixes: ['verse', 'nexus', 'forge', 'pulse'] },
-  { prefix: 'hydro', suffixes: ['nexus', 'forge', 'pulse', 'weave'] },
-  { prefix: 'pyro', suffixes: ['forge', 'pulse', 'nexus', 'storm'] },
-  { prefix: 'geo', suffixes: ['forge', 'pulse', 'nexus', 'core'] },
-  { prefix: 'quantum', suffixes: ['forge', 'flux', 'weave', 'core'] },
-  { prefix: 'cyber', suffixes: ['forge', 'pulse', 'nexus', 'core'] },
-  { prefix: 'techno', suffixes: ['forge', 'pulse', 'weave', 'flux'] },
-  { prefix: 'meta', suffixes: ['verse', 'forge', 'pulse', 'core'] }
+// Domain categorization for elements
+const DOMAINS = {
+  NATURE: ['Water', 'Fire', 'Earth', 'Air', 'Wind', 'Ice', 'Plant', 'Tree', 'Forest', 'Ocean', 'Mountain', 'River', 'Lake'],
+  TECH: ['Bitcoin', 'Cyber', 'Digital', 'Quantum', 'Computer', 'Robot', 'AI', 'Code', 'Network', 'Crypto', 'Tech', 'Data'],
+  CULTURE: ['Music', 'Art', 'Film', 'Dance', 'Book', 'Story', 'Song', 'Painting', 'Sculpture', 'Fashion', 'Media'],
+  MYTHOLOGY: ['Dragon', 'Phoenix', 'Titan', 'God', 'Myth', 'Legend', 'Hero', 'Magic', 'Spirit', 'Soul', 'Fairy'],
+  SCIENCE: ['Atom', 'Energy', 'Plasma', 'Chemical', 'Physics', 'Biology', 'Molecule', 'Element', 'Formula', 'Lab', 'Fusion']
+};
+
+// Function to determine which domain an element belongs to
+const getDomain = (element: string): string => {
+  for (const [domain, elements] of Object.entries(DOMAINS)) {
+    if (elements.some(e => element.toLowerCase().includes(e.toLowerCase()))) {
+      return domain;
+    }
+  }
+  return 'UNKNOWN';
+};
+
+// Add rarity determination function
+const determineRarity = (element1: string, element2: string): Rarity => {
+  const domain1 = getDomain(element1);
+  const domain2 = getDomain(element2);
+  
+  if (domain1 === domain2) return 'Common';
+  if ((domain1 === 'TECH' && domain2 === 'NATURE') || 
+      (domain1 === 'NATURE' && domain2 === 'TECH')) return 'Uncommon';
+  if (domain1 === 'MYTHOLOGY' || domain2 === 'MYTHOLOGY') return 'Rare';
+  return 'Legendary';
+};
+
+// Get a relevant emoji based on domains
+const getRelevantEmoji = (domain1: string, domain2: string): string => {
+  const domainPair = `${domain1}_${domain2}`;
+  
+  const emojiMap: Record<string, string[]> = {
+    'NATURE_NATURE': ['🌿', '🌱', '🌲', '🌊', '🔥', '🌋', '🌍', '🌈', '☀️', '🌙'],
+    'TECH_TECH': ['💻', '🤖', '📱', '🔌', '💾', '🖥️', '📡', '🛰️', '🔋', '⚙️'],
+    'NATURE_TECH': ['🌐', '🔬', '🧪', '🧬', '🔭', '📊', '📈', '🧮', '🔍', '🔎'],
+    'MYTHOLOGY_NATURE': ['🐉', '🦄', '🧚', '🧙‍♂️', '🧝', '🧜‍♀️', '🧞', '🦅', '🦁', '🐺'],
+    'MYTHOLOGY_TECH': ['✨', '🔮', '⚡', '🌟', '💫', '🌠', '🎆', '🎇', '🧿', '📿'],
+    'TECH_CULTURE': ['🎮', '🎬', '🎵', '📺', '📷', '🎨', '🎭', '🎤', '🎧', '🎹'],
+    'NATURE_CULTURE': ['🏞️', '🌅', '🌄', '🏜️', '🏝️', '🏔️', '🌋', '🗻', '🌇', '🌆']
+  };
+  
+  // Try to find emoji for the specific domain pair
+  let emojis = emojiMap[domainPair] || emojiMap[`${domain2}_${domain1}`];
+  
+  // If no specific pair found, use generic emojis
+  if (!emojis) {
+    if (domain1 === 'TECH' || domain2 === 'TECH') {
+      emojis = emojiMap['TECH_TECH'];
+    } else if (domain1 === 'NATURE' || domain2 === 'NATURE') {
+      emojis = emojiMap['NATURE_NATURE'];
+    } else {
+      emojis = ['💫', '✨', '🔮', '🌟', '💎', '🧩', '🎯', '🎪', '🎭', '🎨'];
+    }
+  }
+  
+  // Return a random emoji from the appropriate list
+  return emojis[Math.floor(Math.random() * emojis.length)];
+};
+
+// Thematic word combinations based on domains
+const THEMATIC_COMBINATIONS: Record<string, string[]> = {
+  'NATURE_NATURE': ['Biome', 'Gaia', 'Bloom', 'Terrain', 'Oasis', 'Fauna', 'Flora'],
+  'TECH_TECH': ['Codec', 'Nexus', 'Pixel', 'Byte', 'Cache', 'Chip', 'Grid'],
+  'NATURE_TECH': ['Ecotech', 'Bionet', 'Geobit', 'Terrabyte', 'Aquacode', 'Pyrodata'],
+  'NATURE_CULTURE': ['Artscape', 'Songbird', 'Rhythmleaf', 'Flamedance', 'Aquaverse'],
+  'TECH_CULTURE': ['Dataart', 'Pixelsong', 'Cryptomedia', 'Bitfilm', 'Netdance'],
+  'MYTHOLOGY_NATURE': ['Spiritwood', 'Soulwater', 'Dragonfire', 'Titanearth', 'Mythriver'],
+  'MYTHOLOGY_TECH': ['Spellcode', 'Mythbit', 'Magicnet', 'Souldata', 'Legendgrid'],
+  'SCIENCE_NATURE': ['Atomleaf', 'Molequa', 'Fusionfire', 'Energearth', 'Bioflux'],
+  'SCIENCE_TECH': ['Quantumbit', 'Dataflux', 'Atomcode', 'Molenet', 'Labgrid']
+};
+
+// Simple word patterns for fallback generation
+const SIMPLE_WORDS = [
+  // Nature-related
+  'Dew', 'Mist', 'Moss', 'Peat', 'Silt', 'Clay', 'Ash', 'Coal', 'Lava', 'Rock',
+  // Tech-related
+  'Coin', 'Hash', 'Node', 'Mine', 'Data', 'Code', 'Bit', 'Net', 'Web', 'App',
+  // Combinations
+  'Blend', 'Fuse', 'Merge', 'Bond', 'Link', 'Join', 'Mix', 'Meld', 'Weld', 'Bind'
 ];
+
+// Emoji mappings for simple words
+const SIMPLE_WORD_EMOJIS: Record<string, string> = {
+  'Dew': '💧', 'Mist': '🌫️', 'Moss': '🌿', 'Peat': '🟤', 'Silt': '🟫', 
+  'Clay': '🏺', 'Ash': '🔥', 'Coal': '⚫', 'Lava': '🌋', 'Rock': '🪨',
+  'Coin': '🪙', 'Hash': '#️⃣', 'Node': '🔄', 'Mine': '⛏️', 'Data': '📊', 
+  'Code': '👨‍💻', 'Bit': '💾', 'Net': '🌐', 'Web': '🕸️', 'App': '📱',
+  'Blend': '🔄', 'Fuse': '⚡', 'Merge': '🔀', 'Bond': '🔗', 'Link': '🔗', 
+  'Join': '🤝', 'Mix': '🔄', 'Meld': '🔄', 'Weld': '🔥', 'Bind': '📎'
+};
+
+// Function to generate a fallback word and emoji
+const generateFallbackWord = (element1: string, element2: string): { word: string; emoji: string } => {
+  // Determine domains for thematic combinations
+  const domain1 = getDomain(element1);
+  const domain2 = getDomain(element2);
+  const domainKey = `${domain1}_${domain2}`;
+  const reverseDomainKey = `${domain2}_${domain1}`;
+  
+  // Try to get a thematic word based on domains
+  const thematicWords = THEMATIC_COMBINATIONS[domainKey] || THEMATIC_COMBINATIONS[reverseDomainKey];
+  
+  if (thematicWords && thematicWords.length > 0) {
+    const word = thematicWords[Math.floor(Math.random() * thematicWords.length)];
+    return { 
+      word, 
+      emoji: getRelevantEmoji(domain1, domain2)
+    };
+  }
+  
+  // If no thematic word is found, use a simple word
+  const word = SIMPLE_WORDS[Math.floor(Math.random() * SIMPLE_WORDS.length)];
+  return { 
+    word, 
+    emoji: SIMPLE_WORD_EMOJIS[word] || getRelevantEmoji(domain1, domain2)
+  };
+};
 
 export function useElementCombiner() {
   const [combining, setCombining] = useState(false);
@@ -141,14 +258,20 @@ export function useElementCombiner() {
           
         if (updateError) throw updateError;
 
-        await trackActivity({
-          activity_type: 'element_combined',
-          details: {
-            element_name: word,
-            total_combinations: existing.count + 1,
-            combined_from: [element1, element2]
-          }
-        });
+        // Safely track activity, catching any errors
+        try {
+          await trackActivity({
+            activity_type: 'element_combined',
+            details: {
+              element_name: word,
+              total_combinations: existing.count + 1,
+              combined_from: [element1, element2]
+            }
+          });
+        } catch (activityError) {
+          console.log('Activity tracking error (non-critical):', activityError);
+          // Continue execution even if activity tracking fails
+        }
       } else {
         const { error: insertError } = await supabase
           .from('element_combinations')
@@ -161,44 +284,28 @@ export function useElementCombiner() {
           
         if (insertError) throw insertError;
 
-        await trackActivity({
-          activity_type: 'combination_discovered',
-          details: {
-            element_name: word,
-            is_new: true,
-            combined_from: [element1, element2]
-          }
-        });
+        // Safely track activity, catching any errors
+        try {
+          await trackActivity({
+            activity_type: 'combination_discovered',
+            details: {
+              element_name: word,
+              is_new: true,
+              combined_from: [element1, element2]
+            }
+          });
+        } catch (activityError) {
+          console.log('Activity tracking error (non-critical):', activityError);
+          // Continue execution even if activity tracking fails
+        }
       }
     } catch (error) {
-      console.error('Error updating combination count:', error);
+      console.log('Error updating combination count (non-critical):', error);
+      // Continue execution even if database operations fail
     }
   };
 
-  const generateFallbackWord = (element1: string, element2: string): string => {
-    const isEnergyRelated = element1.includes('Fire') || element2.includes('Fire');
-    const isWaterRelated = element1.includes('Water') || element2.includes('Water');
-    const isCryptoRelated = element1.includes('Bitcoin') || element2.includes('Bitcoin');
-    const isEarthRelated = element1.includes('Earth') || element2.includes('Earth');
-
-    let pattern;
-    if (isEnergyRelated) {
-      pattern = PATTERNS.find(p => p.prefix === 'pyro') || PATTERNS.find(p => p.prefix === 'quantum');
-    } else if (isWaterRelated) {
-      pattern = PATTERNS.find(p => p.prefix === 'hydro');
-    } else if (isCryptoRelated) {
-      pattern = PATTERNS.find(p => p.prefix === 'crypto') || PATTERNS.find(p => p.prefix === 'cyber');
-    } else if (isEarthRelated) {
-      pattern = PATTERNS.find(p => p.prefix === 'geo');
-    } else {
-      pattern = PATTERNS[Math.floor(Math.random() * PATTERNS.length)];
-    }
-
-    const suffix = pattern.suffixes[Math.floor(Math.random() * pattern.suffixes.length)];
-    return pattern.prefix + suffix;
-  };
-
-  const getValidCombination = async (element1: string, element2: string): Promise<{ word: string; emoji: string; translations: Record<SupportedLanguage, string> }> => {
+  const getValidCombination = async (element1: string, element2: string): Promise<{ word: string; emoji: string; translations: Record<SupportedLanguage, string>; rarity: Rarity; domain: string }> => {
     try {
       // Check instant combinations first
       const instant1 = INSTANT_COMBINATIONS[element1]?.[element2];
@@ -206,117 +313,171 @@ export function useElementCombiner() {
       const instant = instant1 || instant2;
 
       if (instant) {
-        await updateCombinationCount(instant.word, element1, element2);
-        const emoji = await getEmojiForCombination(instant.word);
-        return { word: instant.word, emoji, translations: instant.translations };
+        // Use a non-blocking approach for database operations
+        updateCombinationCount(instant.word, element1, element2).catch(err => {
+          console.log('Non-critical database error:', err);
+        });
+        
+        return {
+          word: instant.word,
+          emoji: instant.emoji,
+          translations: instant.translations,
+          rarity: determineRarity(element1, element2),
+          domain: `${getDomain(element1)}_${getDomain(element2)}`
+        };
       }
 
-      const completion = await groq.chat.completions.create({
-        messages: [
-          {
-            role: 'system',
-            content: `You are a creative word generator for "Infinite Ideas.ai", a discovery game where players combine words to create new ones. The game spans ALL domains of human knowledge and culture.
-          CORE MECHANICS:
-          1. Output exactly ONE word (6-15 letters) when two words are combined.
-          2. The resulting word must have a logical or thematic connection to the input words.
-          3. Order doesn't matter (water + fire = fire + water).
-          4. Same word cannot be combined with itself.
-          EXPANSIVE WORD UNIVERSE:
-          This game encompasses ALL domains of language including but not limited to:
-          - Pop culture (TV shows, movies, video games, celebrities)
-          - Music (genres, artists, instruments, songs)
-          - Food and cuisine from all cultures
-          - Countries, cities, and geographic locations
-          - Sports and fitness concepts
-          - Animals, plants, and natural phenomena
-          - Historical periods and figures
-          - Technology and innovation
-          - Art, literature, and creative expression
-          - Education and academic fields
-          - Internet culture and memes
-          - Scientific concepts (though not exclusively scientific)
-          - Words from all eras of English and cultural slang
-          COMBINATION PHILOSOPHY:
-          - Words can combine based on literal meanings (water + flour = dough)
-          - Cultural associations (crown + music = queen)
-          - Thematic connections (sword + story = legend)
-          - Visual similarities (circle + stick = lollipop)
-          - Conceptual relationships (mystery + building = labyrinth)
-          - Wordplay and linguistic connections are encouraged
-          DISCOVERY PROGRESSION:
-          - Start with basic elements but quickly branch into diverse domains
-          - Allow cross-domain combinations (e.g., bitcoin + animal = dogecoin)
-          - Enable pop culture references (e.g., sword + ring = excalibur)
-          - Support combinations from different eras (e.g., ancient + digital = retrogame)
-          RARITY SYSTEM:
-          1. Common: Straightforward combinations
-          2. Uncommon: Cross-domain combinations
-          3. Rare: Multi-step combinations requiring several precursors
-          4. Legendary: Highly specific cultural references or complex chains
-          The goal is to create a rich universe of discoveries that represents the entirety of human knowledge and culture, making players feel rewarded for their creativity and cultural knowledge.`
-          },
-          {
-            role: 'user',
-            content: `Create ONE unique word (6-15 letters) combining ${element1} and ${element2}. ONLY return the word, nothing else.`
-          }
-        ],
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.9, // Increased from 0.7 to encourage more creativity
-        max_tokens: 10, // Increased from 5 to allow for longer words
-        top_p: 1,
-        stream: false
+      // Determine domains for emoji selection
+      const domain1 = getDomain(element1);
+      const domain2 = getDomain(element2);
+
+      // Try to get a word from the AI
+      try {
+        const completion = await groq.chat.completions.create({
+          messages: [
+            {
+              role: 'system',
+              content: `You are a creative word generator for "Infinite Ideas.ai", a discovery game where players combine words to create new ones. The game spans ALL domains of human knowledge and culture.
+            CORE MECHANICS:
+            1. Output exactly ONE word (3-15 letters) when two words are combined.
+            2. The resulting word must have a logical or thematic connection to the input words.
+            3. Order doesn't matter (water + fire = fire + water).
+            4. Same word cannot be combined with itself.
+            EXPANSIVE WORD UNIVERSE:
+            This game encompasses ALL domains of language including but not limited to:
+            - Pop culture (TV shows, movies, video games, celebrities)
+            - Music (genres, artists, instruments, songs)
+            - Food and cuisine from all cultures
+            - Countries, cities, and geographic locations
+            - Sports and fitness concepts
+            - Animals, plants, and natural phenomena
+            - Historical periods and figures
+            - Technology and innovation
+            - Art, literature, and creative expression
+            - Education and academic fields
+            - Internet culture and memes
+            - Scientific concepts (though not exclusively scientific)
+            - Words from all eras of English and cultural slang
+            COMBINATION PHILOSOPHY:
+            - Words can combine based on literal meanings (water + flour = dough)
+            - Cultural associations (crown + music = queen)
+            - Thematic connections (sword + story = legend)
+            - Visual similarities (circle + stick = lollipop)
+            - Conceptual relationships (mystery + building = labyrinth)
+            - Wordplay and linguistic connections are encouraged
+            DISCOVERY PROGRESSION:
+            - Start with basic elements but quickly branch into diverse domains
+            - Allow cross-domain combinations (e.g., bitcoin + animal = dogecoin)
+            - Enable pop culture references (e.g., sword + ring = excalibur)
+            - Support combinations from different eras (e.g., ancient + digital = retrogame)
+            RARITY SYSTEM:
+            1. Common: Straightforward combinations
+            2. Uncommon: Cross-domain combinations
+            3. Rare: Multi-step combinations requiring several precursors
+            4. Legendary: Highly specific cultural references or complex chains
+            The goal is to create a rich universe of discoveries that represents the entirety of human knowledge and culture, making players feel rewarded for their creativity and cultural knowledge.`
+            },
+            {
+              role: 'user',
+              content: `Create ONE unique word (3-15 letters) combining ${element1} and ${element2}. ONLY return the word, nothing else. Prefer shorter, memorable words when possible.`
+            }
+          ],
+          model: 'llama-3.1-8b-instant',
+          temperature: 0.7,
+          max_tokens: 10,
+          top_p: 1,
+          stream: false
+        });
+
+        let newElement = completion.choices[0]?.message?.content?.trim();
+        
+        // Clean up the response
+        if (newElement) {
+          // Remove any punctuation or extra text
+          newElement = newElement.replace(/[^a-zA-Z]/g, '');
+          // Ensure first letter is capitalized
+          newElement = newElement.charAt(0).toUpperCase() + newElement.slice(1).toLowerCase();
+        }
+        
+        if (newElement && 
+            newElement.length >= 3 && 
+            newElement.length <= 15 && 
+            /^[a-zA-Z]+$/.test(newElement)) {
+          
+          // Use a non-blocking approach for database operations
+          updateCombinationCount(newElement, element1, element2).catch(err => {
+            console.log('Non-critical database error:', err);
+          });
+    
+          const [emoji, translations] = await Promise.all([
+            getEmojiForCombination(newElement),
+            getTranslationsForWord(newElement)
+          ]);
+    
+          return {
+            word: newElement,
+            emoji,
+            translations,
+            rarity: determineRarity(element1, element2),
+            domain: `${domain1}_${domain2}`
+          };
+        }
+      } catch (aiError) {
+        console.log('AI generation error, using fallback:', aiError);
+        // Continue to fallback if AI generation fails
+      }
+
+      // Use fallback word generation
+      const { word: fallbackWord, emoji } = generateFallbackWord(element1, element2);
+      const translations = await getTranslationsForWord(fallbackWord);
+
+      // Use a non-blocking approach for database operations
+      updateCombinationCount(fallbackWord, element1, element2).catch(err => {
+        console.log('Non-critical database error:', err);
       });
 
-      let newElement = completion.choices[0]?.message?.content?.trim();
-      
-      // Clean up the response
-      if (newElement) {
-        // Remove any punctuation or extra text
-        newElement = newElement.replace(/[^a-zA-Z]/g, '');
-        // Ensure first letter is capitalized
-        newElement = newElement.charAt(0).toUpperCase() + newElement.slice(1).toLowerCase();
-      }
-      
-      if (newElement && 
-          newElement.length >= 6 && 
-          newElement.length <= 15 && 
-          /^[a-zA-Z]+$/.test(newElement)) {
-        
-        await updateCombinationCount(newElement, element1, element2);
-
-        const [emoji, translations] = await Promise.all([
-          getEmojiForCombination(newElement),
-          getTranslationsForWord(newElement)
-        ]);
-
-        return { word: newElement, emoji, translations };
-      }
-
-      // Use fallback word generation
-      const fallbackWord = generateFallbackWord(element1, element2);
-      
-      const [emoji, translations] = await Promise.all([
-        getEmojiForCombination(fallbackWord),
-        getTranslationsForWord(fallbackWord)
-      ]);
-
-      await updateCombinationCount(fallbackWord, element1, element2);
-
-      return { word: fallbackWord, emoji, translations };
+      return {
+        word: fallbackWord,
+        emoji,
+        translations,
+        rarity: determineRarity(element1, element2),
+        domain: `${domain1}_${domain2}`
+      };
     } catch (error) {
-      console.error('Error in combination attempt:', error);
+      console.log('Error in combination attempt, using simple fallback:', error);
+        
+      // Use simplest possible fallback that won't fail
+      const domain1 = getDomain(element1);
+      const domain2 = getDomain(element2);
+      const fallbackWord = SIMPLE_WORDS[Math.floor(Math.random() * SIMPLE_WORDS.length)];
+      const emoji = SIMPLE_WORD_EMOJIS[fallbackWord] || getRelevantEmoji(domain1, domain2);
       
-      // Use fallback word generation
-      const fallbackWord = generateFallbackWord(element1, element2);
-      
-      const [emoji, translations] = await Promise.all([
-        getEmojiForCombination(fallbackWord),
-        getTranslationsForWord(fallbackWord)
-      ]);
+      try {
+        const translations = await getTranslationsForWord(fallbackWord);
 
-      await updateCombinationCount(fallbackWord, element1, element2);
-
-      return { word: fallbackWord, emoji, translations };
+        return {
+          word: fallbackWord,
+          emoji,
+          translations,
+          rarity: 'Common',
+          domain: 'UNKNOWN_UNKNOWN'
+        };
+      } catch (finalError) {
+        // Absolute last resort fallback that can't fail
+        return {
+          word: 'Blend',
+          emoji: '🔄',
+          translations: {
+            en: 'Blend',
+            es: 'Mezcla',
+            fr: 'Mélange',
+            de: 'Mischung',
+            zh: '混合'
+          },
+          rarity: 'Common',
+          domain: 'UNKNOWN_UNKNOWN'
+        };
+      }
     }
   };
 
