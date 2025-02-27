@@ -9,7 +9,8 @@ import {
   COMBINATION_COOLDOWN,
   getEmojiForCombination,
   getTranslationsForWord,
-  SupportedLanguage
+  SupportedLanguage,
+  getDomain
 } from '../constants';
 
 const groq = new Groq({
@@ -24,7 +25,7 @@ const INSTANT_COMBINATIONS: Record<string, Record<string, { word: string; emoji:
   'Water': {
     'Fire': {
       word: 'Steam',
-      emoji: '💨',
+      emoji: '♨️',
       translations: {
         en: 'Steam',
         es: 'Vapor',
@@ -95,25 +96,6 @@ const INSTANT_COMBINATIONS: Record<string, Record<string, { word: string; emoji:
   }
 };
 
-// Domain categorization for elements
-const DOMAINS = {
-  NATURE: ['Water', 'Fire', 'Earth', 'Air', 'Wind', 'Ice', 'Plant', 'Tree', 'Forest', 'Ocean', 'Mountain', 'River', 'Lake'],
-  TECH: ['Bitcoin', 'Cyber', 'Digital', 'Quantum', 'Computer', 'Robot', 'AI', 'Code', 'Network', 'Crypto', 'Tech', 'Data'],
-  CULTURE: ['Music', 'Art', 'Film', 'Dance', 'Book', 'Story', 'Song', 'Painting', 'Sculpture', 'Fashion', 'Media'],
-  MYTHOLOGY: ['Dragon', 'Phoenix', 'Titan', 'God', 'Myth', 'Legend', 'Hero', 'Magic', 'Spirit', 'Soul', 'Fairy'],
-  SCIENCE: ['Atom', 'Energy', 'Plasma', 'Chemical', 'Physics', 'Biology', 'Molecule', 'Element', 'Formula', 'Lab', 'Fusion']
-};
-
-// Function to determine which domain an element belongs to
-const getDomain = (element: string): string => {
-  for (const [domain, elements] of Object.entries(DOMAINS)) {
-    if (elements.some(e => element.toLowerCase().includes(e.toLowerCase()))) {
-      return domain;
-    }
-  }
-  return 'UNKNOWN';
-};
-
 // Add rarity determination function
 const determineRarity = (element1: string, element2: string): Rarity => {
   const domain1 = getDomain(element1);
@@ -124,51 +106,6 @@ const determineRarity = (element1: string, element2: string): Rarity => {
       (domain1 === 'NATURE' && domain2 === 'TECH')) return 'Uncommon';
   if (domain1 === 'MYTHOLOGY' || domain2 === 'MYTHOLOGY') return 'Rare';
   return 'Legendary';
-};
-
-// Get a relevant emoji based on domains
-const getRelevantEmoji = (domain1: string, domain2: string): string => {
-  const domainPair = `${domain1}_${domain2}`;
-  
-  const emojiMap: Record<string, string[]> = {
-    'NATURE_NATURE': ['🌿', '🌱', '🌲', '🌊', '🔥', '🌋', '🌍', '🌈', '☀️', '🌙'],
-    'TECH_TECH': ['💻', '🤖', '📱', '🔌', '💾', '🖥️', '📡', '🛰️', '🔋', '⚙️'],
-    'NATURE_TECH': ['🌐', '🔬', '🧪', '🧬', '🔭', '📊', '📈', '🧮', '🔍', '🔎'],
-    'MYTHOLOGY_NATURE': ['🐉', '🦄', '🧚', '🧙‍♂️', '🧝', '🧜‍♀️', '🧞', '🦅', '🦁', '🐺'],
-    'MYTHOLOGY_TECH': ['✨', '🔮', '⚡', '🌟', '💫', '🌠', '🎆', '🎇', '🧿', '📿'],
-    'TECH_CULTURE': ['🎮', '🎬', '🎵', '📺', '📷', '🎨', '🎭', '🎤', '🎧', '🎹'],
-    'NATURE_CULTURE': ['🏞️', '🌅', '🌄', '🏜️', '🏝️', '🏔️', '🌋', '🗻', '🌇', '🌆']
-  };
-  
-  // Try to find emoji for the specific domain pair
-  let emojis = emojiMap[domainPair] || emojiMap[`${domain2}_${domain1}`];
-  
-  // If no specific pair found, use generic emojis
-  if (!emojis) {
-    if (domain1 === 'TECH' || domain2 === 'TECH') {
-      emojis = emojiMap['TECH_TECH'];
-    } else if (domain1 === 'NATURE' || domain2 === 'NATURE') {
-      emojis = emojiMap['NATURE_NATURE'];
-    } else {
-      emojis = ['💫', '✨', '🔮', '🌟', '💎', '🧩', '🎯', '🎪', '🎭', '🎨'];
-    }
-  }
-  
-  // Return a random emoji from the appropriate list
-  return emojis[Math.floor(Math.random() * emojis.length)];
-};
-
-// Thematic word combinations based on domains
-const THEMATIC_COMBINATIONS: Record<string, string[]> = {
-  'NATURE_NATURE': ['Biome', 'Gaia', 'Bloom', 'Terrain', 'Oasis', 'Fauna', 'Flora'],
-  'TECH_TECH': ['Codec', 'Nexus', 'Pixel', 'Byte', 'Cache', 'Chip', 'Grid'],
-  'NATURE_TECH': ['Ecotech', 'Bionet', 'Geobit', 'Terrabyte', 'Aquacode', 'Pyrodata'],
-  'NATURE_CULTURE': ['Artscape', 'Songbird', 'Rhythmleaf', 'Flamedance', 'Aquaverse'],
-  'TECH_CULTURE': ['Dataart', 'Pixelsong', 'Cryptomedia', 'Bitfilm', 'Netdance'],
-  'MYTHOLOGY_NATURE': ['Spiritwood', 'Soulwater', 'Dragonfire', 'Titanearth', 'Mythriver'],
-  'MYTHOLOGY_TECH': ['Spellcode', 'Mythbit', 'Magicnet', 'Souldata', 'Legendgrid'],
-  'SCIENCE_NATURE': ['Atomleaf', 'Molequa', 'Fusionfire', 'Energearth', 'Bioflux'],
-  'SCIENCE_TECH': ['Quantumbit', 'Dataflux', 'Atomcode', 'Molenet', 'Labgrid']
 };
 
 // Simple word patterns for fallback generation
@@ -189,6 +126,22 @@ const SIMPLE_WORD_EMOJIS: Record<string, string> = {
   'Code': '👨‍💻', 'Bit': '💾', 'Net': '🌐', 'Web': '🕸️', 'App': '📱',
   'Blend': '🔄', 'Fuse': '⚡', 'Merge': '🔀', 'Bond': '🔗', 'Link': '🔗', 
   'Join': '🤝', 'Mix': '🔄', 'Meld': '🔄', 'Weld': '🔥', 'Bind': '📎'
+};
+
+// Thematic word combinations based on domains
+const THEMATIC_COMBINATIONS: Record<string, string[]> = {
+  'NATURE_NATURE': ['Biome', 'Gaia', 'Bloom', 'Terrain', 'Oasis', 'Fauna', 'Flora'],
+  'TECH_TECH': ['Codec', 'Nexus', 'Pixel', 'Byte', 'Cache', 'Chip', 'Grid'],
+  'NATURE_TECH': ['Ecotech', 'Bionet', 'Geobit', 'Terrabyte', 'Aquacode', 'Pyrodata'],
+  'NATURE_CULTURE': ['Artscape', 'Songbird', 'Rhythmleaf', 'Flamedance', 'Aquaverse'],
+  'TECH_CULTURE': ['Dataart', 'Pixelsong', 'Cryptomedia', 'Bitfilm', 'Netdance'],
+  'MYTHOLOGY_NATURE': ['Spiritwood', 'Soulwater', 'Dragonfire', 'Titanearth', 'Mythriver'],
+  'MYTHOLOGY_TECH': ['Spellcode', 'Mythbit', 'Magicnet', 'Souldata', 'Legendgrid'],
+  'SCIENCE_NATURE': ['Atomleaf', 'Molequa', 'Fusionfire', 'Energearth', 'Bioflux'],
+  'SCIENCE_TECH': ['Quantumbit', 'Dataflux', 'Atomcode', 'Molenet', 'Labgrid'],
+  'ELEMENTAL_TECH': ['Firebit', 'Aquacode', 'Terranet', 'Winddata', 'Frostbyte'],
+  'ELEMENTAL_NATURE': ['Blazeleaf', 'Aquaflora', 'Terramoss', 'Windwood', 'Frostbloom'],
+  'ELEMENTAL_ELEMENTAL': ['Pyroflow', 'Hydroblaze', 'Geostorm', 'Aeroflame', 'Cryoburn']
 };
 
 // Function to generate a fallback word and emoji
@@ -278,7 +231,7 @@ export function useElementCombiner() {
           .insert([{ 
             name: word, 
             count: 1,
-            created_at: new Date().toISOString(),
+            created_at: new Date(). toISOString(),
             updated_at: new Date().toISOString()
           }]);
           
