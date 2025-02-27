@@ -110,9 +110,7 @@ export const createCheckoutSession = async (
           price: packageDetails.price,
           status: 'pending',
           stripe_session_id: session.id
-        })
-        .select()
-        .single();
+        });
         
       if (error) {
         console.error('Error creating purchase record:', error);
@@ -151,9 +149,7 @@ export const createCheckoutSession = async (
           price: packageDetails.price,
           status: 'pending',
           stripe_session_id: sessionId
-        })
-        .select()
-        .single();
+        });
         
       if (error) {
         console.error('Error creating purchase record:', error);

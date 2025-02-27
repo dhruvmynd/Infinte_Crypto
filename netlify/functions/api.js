@@ -87,8 +87,8 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Health check endpoint - handle both direct and /api/ prefixed routes
+app.get(['/health', '/api/health'], (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
