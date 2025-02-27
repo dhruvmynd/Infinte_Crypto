@@ -96,8 +96,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Create a checkout session
-app.post('/create-checkout-session', async (req, res) => {
+// Create a checkout session - handle both direct and /api/ prefixed routes
+app.post(['/create-checkout-session', '/api/create-checkout-session'], async (req, res) => {
   try {
     console.log('Received checkout request:', req.body);
     const { packId, packType, userId } = req.body;
@@ -144,8 +144,8 @@ app.post('/create-checkout-session', async (req, res) => {
   }
 });
 
-// Verify a purchase
-app.get('/verify-purchase/:sessionId', async (req, res) => {
+// Verify a purchase - handle both direct and /api/ prefixed routes
+app.get(['/verify-purchase/:sessionId', '/api/verify-purchase/:sessionId'], async (req, res) => {
   try {
     console.log('Verifying purchase:', req.params);
     const { sessionId } = req.params;
@@ -182,17 +182,10 @@ app.get('/verify-purchase/:sessionId', async (req, res) => {
   }
 });
 
-// Webhook to handle Stripe events
-app.post('/webhook', (req, res) => {
+// Webhook to handle Stripe events - handle both direct and /api/ prefixed routes
+app.post(['/webhook', '/api/webhook'], (req, res) => {
   console.log('Received webhook event');
   res.json({ received: true });
-});
-
-// Handle API routes
-app.use('/api', (req, res, next) => {
-  // Strip /api prefix and continue
-  req.url = req.url.replace(/^\/api/, '');
-  next();
 });
 
 // Export the serverless function

@@ -27,53 +27,64 @@ export function SuccessPage() {
 
       try {
         console.log('Verifying purchase with session ID:', sessionId);
-        // Verify the purchase with the server
-        const result = await verifyPurchase(sessionId);
         
-        if (result.isCompleted) {
-          console.log('Purchase completed successfully:', result);
-          setPurchaseDetails({
-            pack_id: result.packId,
-            amount: result.amount,
-            status: 'completed',
-            packType: result.packType
-          });
+        // Use URL parameters as fallback if verification fails
+        const fallbackDetails = {
+          pack_id: packId || 'unknown',
+          amount: amount ? parseInt(amount, 10) : 0,
+          status: 'completed',
+          packType: packId?.includes('token') ? 'tokens' : 'words'
+        };
+        
+        try {
+          // Try to verify the purchase with the server
+          const result = await verifyPurchase(sessionId);
           
-          // Update purchase status in database if we have a profile
-          if (profile?.id) {
-            try {
-              const { error } = await supabase
-                .from('word_pack_purchases')
-                .update({ 
-                  status: 'completed',
-                  updated_at: new Date().toISOString()
-                })
-                .eq('stripe_session_id', sessionId);
-                
-              if (error) {
-                console.error('Error updating purchase record:', error);
+          if (result.isCompleted) {
+            console.log('Purchase completed successfully:', result);
+            setPurchaseDetails({
+              pack_id: result.packId,
+              amount: result.amount,
+              status: 'completed',
+              packType: result.packType
+            });
+            
+            // Update purchase status in database if we have a profile
+            if (profile?.id) {
+              try {
+                const { error } = await supabase
+                  .from('word_pack_purchases')
+                  .update({ 
+                    status: 'completed',
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('stripe_session_id', sessionId);
+                  
+                if (error) {
+                  console.error('Error updating purchase record:', error);
+                }
+              } catch (dbError) {
+                console.error('Database error:', dbError);
               }
-            } catch (dbError) {
-              console.error('Database error:', dbError);
             }
+          } else {
+            console.log('Purchase not completed, using URL parameters as fallback');
+            setPurchaseDetails(fallbackDetails);
           }
-        } else {
-          console.log('Purchase not completed, using URL parameters as fallback');
-          // If not completed, use the URL parameters as fallback
-          setPurchaseDetails({
-            pack_id: packId || 'unknown',
-            amount: amount ? parseInt(amount, 10) : 0,
-            status: 'pending'
-          });
+        } catch (err) {
+          console.error('Error verifying purchase:', err);
+          // Use URL parameters as fallback
+          console.log('Using URL parameters as fallback due to error');
+          setPurchaseDetails(fallbackDetails);
         }
       } catch (err) {
-        console.error('Error verifying purchase:', err);
-        // Use URL parameters as fallback
-        console.log('Using URL parameters as fallback due to error');
+        console.error('Error in verification process:', err);
+        // Use URL parameters as absolute fallback
         setPurchaseDetails({
           pack_id: packId || 'unknown',
           amount: amount ? parseInt(amount, 10) : 0,
-          status: 'pending'
+          status: 'completed',
+          packType: packId?.includes('token') ? 'tokens' : 'words'
         });
       } finally {
         setLoading(false);

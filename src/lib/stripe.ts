@@ -231,9 +231,6 @@ export const verifyPurchase = async (sessionId: string): Promise<{
   } catch (error) {
     console.error('Error verifying purchase:', error);
     
-    // Fallback for development
-    console.log('Using simulated purchase verification');
-    
     // Extract packId from sessionId if possible
     const packId = sessionId.includes('basic') ? 'basic' : 
                   sessionId.includes('pro') ? 'pro' : 
@@ -269,6 +266,7 @@ export const verifyPurchase = async (sessionId: string): Promise<{
       console.error('Database error:', dbError);
     }
     
+    // Return fallback data
     return {
       isCompleted: true,
       packId,

@@ -7,4 +7,19 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  build: {
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
+    rollupOptions: {
+      // Ensure external dependencies are properly handled
+      external: [],
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          thirdweb: ['@thirdweb-dev/react', '@thirdweb-dev/sdk', '@thirdweb-dev/chains'],
+        }
+      }
+    }
+  }
 });
