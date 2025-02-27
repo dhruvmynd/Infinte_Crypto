@@ -73,7 +73,7 @@ const TOKEN_PACKAGES = [
 ];
 
 // Root endpoint
-app.get('/', (req, res) => {
+app.get(['/', '/api'], (req, res) => {
   res.json({ 
     message: 'Infinite Ideas API Server',
     version: '1.0.0',
