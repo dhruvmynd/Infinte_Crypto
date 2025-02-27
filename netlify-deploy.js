@@ -44,6 +44,15 @@ async function checkUrl(url) {
 async function deployToNetlify() {
   console.log('Building and deploying to Netlify...');
   try {
+    // Ensure function dependencies are installed
+    console.log('Installing function dependencies...');
+    try {
+      await execAsync('cd netlify/functions && npm install');
+    } catch (funcError) {
+      console.warn('Warning: Could not install function dependencies locally:', funcError.message);
+      console.log('Continuing with deployment - dependencies will be installed during build...');
+    }
+    
     // Build the application
     console.log('Building the application...');
     await execAsync('npm run build');

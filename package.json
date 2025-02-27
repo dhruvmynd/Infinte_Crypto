@@ -11,7 +11,8 @@
     "server": "node --no-warnings server.js",
     "health-check": "node health-check.js",
     "deploy": "node netlify-deploy.js",
-    "check-deployment": "node deployment-check.js"
+    "check-deployment": "node deployment-check.js",
+    "postbuild": "cd netlify/functions && npm install"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.7",
@@ -29,7 +30,8 @@
     "node-fetch": "^3.3.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.22.1"
+    "react-router-dom": "^6.22.1",
+    "serverless-http": "^3.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
