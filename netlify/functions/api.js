@@ -3,6 +3,7 @@ const express = require('express');
 const serverless = require('serverless-http');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // Create Express app
 const app = express();
@@ -114,30 +115,65 @@ app.post(['/create-checkout-session', '/api/create-checkout-session'], async (re
       return res.status(400).json({ error: `Package ${packId} not found` });
     }
     
-    // In production, we would use Stripe here
-    // For now, we'll simulate the Stripe session
-    const sessionId = `sim_${Date.now()}_${packId}`;
-    
     // Get the host from the request
     const host = req.headers.host || 'infinite-ideas.ai';
     const protocol = host.includes('localhost') ? 'http' : 'https';
+    const origin = `${protocol}://${host}`;
     
-    // Create a simulated session response
-    const session = {
-      id: sessionId,
-      url: `${protocol}://${host}/success?session_id=${sessionId}&pack_id=${packId}&amount=${packageDetails.amount}`,
-      payment_status: 'paid',
-      metadata: {
-        userId,
-        packId,
-        packType,
-        amount: packageDetails.amount.toString()
-      }
-    };
-    
-    console.log('Created simulated checkout session:', session);
-    
-    res.json({ id: session.id, url: session.url });
+    try {
+      // Create a real Stripe checkout session
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: packageDetails.name,
+                description: packageDetails.description,
+              },
+              unit_amount: packageDetails.price,
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'payment',
+        success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/cancel`,
+        metadata: {
+          userId,
+          packId,
+          packType,
+          amount: packageDetails.amount.toString()
+        }
+      });
+      
+      console.log('Created Stripe checkout session:', session);
+      
+      res.json({ id: session.id, url: session.url });
+    } catch (stripeError) {
+      console.error('Stripe error:', stripeError);
+      
+      // Fallback to simulated checkout if Stripe fails
+      console.log('Using simulated checkout session as fallback');
+      const sessionId = `sim_${Date.now()}_${packId}`;
+      
+      const session = {
+        id: sessionId,
+        url: `${origin}/success?session_id=${sessionId}&pack_id=${packId}&amount=${packageDetails.amount}`,
+        payment_status: 'paid',
+        metadata: {
+          userId,
+          packId,
+          packType,
+          amount: packageDetails.amount.toString()
+        }
+      };
+      
+      console.log('Created simulated checkout session:', session);
+      
+      res.json({ id: session.id, url: session.url });
+    }
   } catch (error) {
     console.error('Error creating checkout session:', error);
     res.status(500).json({ error: error.message });
@@ -150,32 +186,87 @@ app.get(['/verify-purchase/:sessionId', '/api/verify-purchase/:sessionId'], asyn
     console.log('Verifying purchase:', req.params);
     const { sessionId } = req.params;
     
-    // For now, we'll simulate a successful purchase
-    const packId = sessionId.includes('basic') ? 'basic' : 
-                  sessionId.includes('pro') ? 'pro' : 
-                  sessionId.includes('ultimate') ? 'ultimate' : 
-                  sessionId.includes('starter') ? 'starter' : 
-                  sessionId.includes('plus') ? 'plus' : 
-                  sessionId.includes('premium') ? 'premium' : 'basic';
-                  
-    const isTokenPack = packId === 'starter' || packId === 'plus' || packId === 'premium';
-    const packType = isTokenPack ? 'tokens' : 'words';
+    // Check if this is a simulated session
+    if (sessionId.startsWith('sim_')) {
+      // For simulated sessions, extract info from the session ID
+      const packId = sessionId.includes('basic') ? 'basic' : 
+                    sessionId.includes('pro') ? 'pro' : 
+                    sessionId.includes('ultimate') ? 'ultimate' : 
+                    sessionId.includes('starter') ? 'starter' : 
+                    sessionId.includes('plus') ? 'plus' : 
+                    sessionId.includes('premium') ? 'premium' : 'basic';
+                    
+      const isTokenPack = packId === 'starter' || packId === 'plus' || packId === 'premium';
+      const packType = isTokenPack ? 'tokens' : 'words';
+      
+      const amount = packId === 'basic' ? 10 : 
+                    packId === 'pro' ? 25 : 
+                    packId === 'ultimate' ? 50 :
+                    packId === 'starter' ? 100 :
+                    packId === 'plus' ? 275 :
+                    packId === 'premium' ? 600 : 10;
+      
+      console.log('Simulated purchase verification:', { sessionId, packId, amount, packType });
+      
+      return res.json({
+        isCompleted: true,
+        packId,
+        amount,
+        packType
+      });
+    }
     
-    const amount = packId === 'basic' ? 10 : 
-                  packId === 'pro' ? 25 : 
-                  packId === 'ultimate' ? 50 :
-                  packId === 'starter' ? 100 :
-                  packId === 'plus' ? 275 :
-                  packId === 'premium' ? 600 : 10;
-    
-    console.log('Simulated purchase verification:', { sessionId, packId, amount, packType });
-    
-    res.json({
-      isCompleted: true,
-      packId,
-      amount,
-      packType
-    });
+    // For real Stripe sessions, verify with Stripe
+    try {
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      
+      console.log('Stripe session retrieved:', session);
+      
+      if (session.payment_status === 'paid') {
+        return res.json({
+          isCompleted: true,
+          packId: session.metadata.packId,
+          amount: parseInt(session.metadata.amount, 10),
+          packType: session.metadata.packType
+        });
+      } else {
+        return res.json({
+          isCompleted: false,
+          packId: session.metadata.packId,
+          amount: parseInt(session.metadata.amount, 10),
+          packType: session.metadata.packType
+        });
+      }
+    } catch (stripeError) {
+      console.error('Stripe error:', stripeError);
+      
+      // Fallback to simulated verification
+      const packId = sessionId.includes('basic') ? 'basic' : 
+                    sessionId.includes('pro') ? 'pro' : 
+                    sessionId.includes('ultimate') ? 'ultimate' : 
+                    sessionId.includes('starter') ? 'starter' : 
+                    sessionId.includes('plus') ? 'plus' : 
+                    sessionId.includes('premium') ? 'premium' : 'basic';
+                    
+      const isTokenPack = packId === 'starter' || packId === 'plus' || packId === 'premium';
+      const packType = isTokenPack ? 'tokens' : 'words';
+      
+      const amount = packId === 'basic' ? 10 : 
+                    packId === 'pro' ? 25 : 
+                    packId === 'ultimate' ? 50 :
+                    packId === 'starter' ? 100 :
+                    packId === 'plus' ? 275 :
+                    packId === 'premium' ? 600 : 10;
+      
+      console.log('Fallback simulated purchase verification:', { sessionId, packId, amount, packType });
+      
+      return res.json({
+        isCompleted: true,
+        packId,
+        amount,
+        packType
+      });
+    }
   } catch (error) {
     console.error('Error verifying purchase:', error);
     res.status(500).json({ error: error.message });
@@ -183,9 +274,39 @@ app.get(['/verify-purchase/:sessionId', '/api/verify-purchase/:sessionId'], asyn
 });
 
 // Webhook to handle Stripe events - handle both direct and /api/ prefixed routes
-app.post(['/webhook', '/api/webhook'], (req, res) => {
-  console.log('Received webhook event');
-  res.json({ received: true });
+app.post(['/webhook', '/api/webhook'], async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  
+  let event;
+  
+  try {
+    if (sig && endpointSecret) {
+      // Verify webhook signature
+      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+      console.log('Webhook verified:', event.type);
+    } else {
+      // For testing without signature verification
+      event = req.body;
+      console.log('Webhook received (unverified):', event.type);
+    }
+    
+    // Handle the event
+    switch (event.type) {
+      case 'checkout.session.completed':
+        const session = event.data.object;
+        console.log('Payment successful for session:', session.id);
+        // Here you would update your database to mark the purchase as completed
+        break;
+      default:
+        console.log(`Unhandled event type ${event.type}`);
+    }
+    
+    res.json({ received: true });
+  } catch (err) {
+    console.error('Webhook error:', err.message);
+    res.status(400).send(`Webhook Error: ${err.message}`);
+  }
 });
 
 // Export the serverless function

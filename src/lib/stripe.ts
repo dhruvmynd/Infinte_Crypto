@@ -5,7 +5,7 @@ import { useAddress } from "@thirdweb-dev/react";
 import { StripeCheckoutSession } from '../types';
 
 // Stripe public key from environment variables
-const STRIPE_PUBLIC_KEY = 'pk_test_51Qw9leHFzTpvfWfCsP5HIxNiF8pjgqAykxPQ3Eez3u1lggiASkuTtzcaIJcwtnWhz3DNkHzyb0oUTvM9AKwUL19E00opWZ8V54';
+const STRIPE_PUBLIC_KEY = import.meta.env.VITE_STRIPE_PUBLIC_KEY || 'pk_test_51Qw9leHFzTpvfWfCsP5HIxNiF8pjgqAykxPQ3Eez3u1lggiASkuTtzcaIJcwtnWhz3DNkHzyb0oUTvM9AKwUL19E00opWZ8V54';
 
 // API URL - use environment variable or default to relative path for production
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -94,20 +94,13 @@ export const createCheckoutSession = async (
     
     // Create a record in the database
     try {
-      const packages = packType === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
-      const packageDetails = packages.find(p => p.id === packId);
-      
-      if (!packageDetails) {
-        throw new Error(`Package ${packId} not found`);
-      }
-      
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('word_pack_purchases')
         .insert({
           user_id: userId,
           pack_id: packId,
-          amount: packageDetails.amount,
-          price: packageDetails.price,
+          amount: getPackageAmount(packId, packType),
+          price: getPackagePrice(packId, packType),
           status: 'pending',
           stripe_session_id: session.id
         });
@@ -115,7 +108,7 @@ export const createCheckoutSession = async (
       if (error) {
         console.error('Error creating purchase record:', error);
       } else {
-        console.log('Created purchase record:', data);
+        console.log('Created purchase record');
       }
     } catch (dbError) {
       console.error('Database error:', dbError);
@@ -125,48 +118,23 @@ export const createCheckoutSession = async (
     return session;
   } catch (error) {
     console.error('Error creating checkout session:', error);
-    
-    // Fallback to simulated checkout for development
-    console.log('Using simulated checkout session');
-    const packages = packType === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
-    const packageDetails = packages.find(p => p.id === packId);
-    
-    if (!packageDetails) {
-      throw new Error(`Package ${packId} not found`);
-    }
-    
-    // Generate a unique session ID
-    const sessionId = `sim_${Date.now()}_${packId}`;
-    
-    // Create a record in the database
-    try {
-      const { data, error } = await supabase
-        .from('word_pack_purchases')
-        .insert({
-          user_id: userId,
-          pack_id: packId,
-          amount: packageDetails.amount,
-          price: packageDetails.price,
-          status: 'pending',
-          stripe_session_id: sessionId
-        });
-        
-      if (error) {
-        console.error('Error creating purchase record:', error);
-      } else {
-        console.log('Created purchase record:', data);
-      }
-    } catch (dbError) {
-      console.error('Database error:', dbError);
-    }
-    
-    // Return simulated session
-    return {
-      id: sessionId,
-      url: `/success?session_id=${sessionId}&pack_id=${packId}&amount=${packageDetails.amount}`
-    };
+    throw error;
   }
 };
+
+// Helper function to get package amount
+function getPackageAmount(packId: string, packType: 'words' | 'tokens'): number {
+  const packages = packType === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
+  const packageDetails = packages.find(p => p.id === packId);
+  return packageDetails?.amount || 0;
+}
+
+// Helper function to get package price
+function getPackagePrice(packId: string, packType: 'words' | 'tokens'): number {
+  const packages = packType === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
+  const packageDetails = packages.find(p => p.id === packId);
+  return packageDetails?.price || 0;
+}
 
 // Redirect to checkout
 export const redirectToCheckout = async (session: StripeCheckoutSession) => {

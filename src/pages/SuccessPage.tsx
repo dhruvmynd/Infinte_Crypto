@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
 import { verifyPurchase } from '../lib/stripe';
+import { Toast } from '../components/Toast';
 
 export function SuccessPage() {
   const [searchParams] = useSearchParams();
@@ -13,6 +14,7 @@ export function SuccessPage() {
   const { profile } = useProfile();
   const [loading, setLoading] = useState(true);
   const [purchaseDetails, setPurchaseDetails] = useState<any>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'loading' } | null>(null);
   
   const sessionId = searchParams.get('session_id');
   const packId = searchParams.get('pack_id');
@@ -24,6 +26,11 @@ export function SuccessPage() {
         navigate('/');
         return;
       }
+
+      setToast({
+        message: 'Verifying your purchase...',
+        type: 'loading'
+      });
 
       try {
         console.log('Verifying purchase with session ID:', sessionId);
@@ -49,6 +56,11 @@ export function SuccessPage() {
               packType: result.packType
             });
             
+            setToast({
+              message: 'Purchase completed successfully!',
+              type: 'success'
+            });
+            
             // Update purchase status in database if we have a profile
             if (profile?.id) {
               try {
@@ -70,12 +82,22 @@ export function SuccessPage() {
           } else {
             console.log('Purchase not completed, using URL parameters as fallback');
             setPurchaseDetails(fallbackDetails);
+            
+            setToast({
+              message: 'Purchase verification pending. Your items will be added soon.',
+              type: 'loading'
+            });
           }
         } catch (err) {
           console.error('Error verifying purchase:', err);
           // Use URL parameters as fallback
           console.log('Using URL parameters as fallback due to error');
           setPurchaseDetails(fallbackDetails);
+          
+          setToast({
+            message: 'Unable to verify purchase. Please contact support if items are not added.',
+            type: 'error'
+          });
         }
       } catch (err) {
         console.error('Error in verification process:', err);
@@ -86,8 +108,18 @@ export function SuccessPage() {
           status: 'completed',
           packType: packId?.includes('token') ? 'tokens' : 'words'
         });
+        
+        setToast({
+          message: 'Error processing purchase. Please contact support.',
+          type: 'error'
+        });
       } finally {
         setLoading(false);
+        
+        // Clear toast after 5 seconds
+        setTimeout(() => {
+          setToast(null);
+        }, 5000);
       }
     };
 
@@ -95,6 +127,10 @@ export function SuccessPage() {
       verifyPurchaseDetails();
     } else {
       setLoading(false);
+      setToast({
+        message: 'Invalid session. Please try again.',
+        type: 'error'
+      });
     }
   }, [sessionId, navigate, profile?.id, packId, amount]);
 
@@ -137,6 +173,14 @@ export function SuccessPage() {
           <ArrowRight size={18} />
         </button>
       </div>
+      
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
