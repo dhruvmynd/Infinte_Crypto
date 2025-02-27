@@ -64,7 +64,7 @@ export function useUserElements() {
           console.error('Error deleting existing elements:', deleteError);
         }
 
-        // Filter out base elements and elements without positions
+        // Filter out base elements and only save generated elements
         const elementsToSave = elements.filter(
           element => !element.isBaseElement && element.combinedFrom?.length >= 2
         );
@@ -73,15 +73,25 @@ export function useUserElements() {
           return [];
         }
 
+        // Prepare elements for saving - create a clean copy without position data
+        const cleanedElements = elementsToSave.map(element => {
+          // Create a deep copy of the element
+          const cleanElement = { ...element };
+          
+          // Remove position data for storage
+          delete cleanElement.position;
+          delete cleanElement.connectedPoints;
+          
+          return {
+            user_id: userId,
+            element_data: cleanElement
+          };
+        });
+
         // Insert new elements
         const { data, error } = await supabase
           .from('user_elements')
-          .insert(
-            elementsToSave.map(element => ({
-              user_id: userId,
-              element_data: element
-            }))
-          )
+          .insert(cleanedElements)
           .select();
 
         if (error) {

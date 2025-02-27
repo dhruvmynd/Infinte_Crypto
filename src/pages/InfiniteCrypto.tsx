@@ -47,6 +47,7 @@ function InfiniteCrypto() {
   const [score, setScore] = useState(0);
   const [totalGeneratedWords, setTotalGeneratedWords] = useState(0);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const initialLoadDoneRef = useRef(false);
 
   const getElementName = (item: DraggableItem) => {
     return item.translations?.[currentLanguage] || item.name;
@@ -68,7 +69,7 @@ function InfiniteCrypto() {
 
   // Load saved elements when user logs in
   useEffect(() => {
-    if (!elementsLoading && savedElements.length > 0) {
+    if (!elementsLoading && savedElements.length > 0 && !initialLoadDoneRef.current) {
       // Merge base elements with saved elements
       const mergedItems = [...baseElements];
       
@@ -79,15 +80,17 @@ function InfiniteCrypto() {
         );
         
         if (!exists) {
-          // Reset position to null so they appear in the list
+          // Add to the list with position set to null
           mergedItems.push({
             ...savedElement,
-            position: null
+            position: null,
+            connectedPoints: []
           });
         }
       });
       
       setItems(mergedItems);
+      initialLoadDoneRef.current = true;
     }
   }, [savedElements, elementsLoading]);
 
@@ -100,7 +103,9 @@ function InfiniteCrypto() {
     
     if (profile?.id && items.length > baseElements.length) {
       saveTimeoutRef.current = setTimeout(() => {
-        saveUserElements(items);
+        // Create a deep copy of items to avoid modifying the current state
+        const itemsToSave = [...items];
+        saveUserElements(itemsToSave);
       }, 2000); // Save after 2 seconds of inactivity
     }
     
@@ -212,6 +217,18 @@ function InfiniteCrypto() {
     if (item.isBaseElement) {
       const newInstance = createDraggedInstance(item, { x, y });
       setItems(prev => [...prev, newInstance]);
+      if (soundEnabled) {
+        soundEffects.current?.playDropSound();
+      }
+    } else {
+      // If it's a generated element in the list, place it on the canvas
+      setItems(prev => 
+        prev.map(existingItem => 
+          existingItem.id === item.id 
+            ? { ...existingItem, position: { x, y }, connectedPoints: [] }
+            : existingItem
+        )
+      );
       if (soundEnabled) {
         soundEffects.current?.playDropSound();
       }
