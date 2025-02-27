@@ -7,21 +7,8 @@ import { StripeCheckoutSession } from '../types';
 // Stripe public key from environment variables
 const STRIPE_PUBLIC_KEY = 'pk_test_51Qw9leHFzTpvfWfCsP5HIxNiF8pjgqAykxPQ3Eez3u1lggiASkuTtzcaIJcwtnWhz3DNkHzyb0oUTvM9AKwUL19E00opWZ8V54';
 
-// API URL - dynamically determine the correct API URL
-const getApiUrl = () => {
-  // In production, use relative paths
-  if (import.meta.env.PROD) {
-    return '';
-  }
-  
-  // In development, use the environment variable if set
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  
-  // Default to localhost:3001 for development
-  return 'http://localhost:3001';
-};
+// API URL - use environment variable or default to relative path for production
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 // Word pack definitions
 export const WORD_PACKS = [
@@ -81,15 +68,13 @@ export const createCheckoutSession = async (
 ): Promise<StripeCheckoutSession> => {
   try {
     console.log('Creating checkout session for user:', userId);
-    const apiUrl = getApiUrl();
-    console.log('Using API URL:', apiUrl);
+    console.log('API URL:', API_URL);
     
     // Call the server API to create a checkout session
-    const response = await fetch(`${apiUrl}/create-checkout-session`, {
+    const response = await fetch(`${API_URL}/create-checkout-session`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache'
       },
       body: JSON.stringify({
         packId,
@@ -212,14 +197,9 @@ export const verifyPurchase = async (sessionId: string): Promise<{
 }> => {
   try {
     console.log('Verifying purchase for session:', sessionId);
-    const apiUrl = getApiUrl();
-    console.log('Using API URL:', apiUrl);
+    console.log('API URL:', API_URL);
     
-    const response = await fetch(`${apiUrl}/verify-purchase/${sessionId}`, {
-      headers: {
-        'Cache-Control': 'no-cache'
-      }
-    });
+    const response = await fetch(`${API_URL}/verify-purchase/${sessionId}`);
     
     if (!response.ok) {
       const errorText = await response.text();

@@ -90,7 +90,7 @@ export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
           <X size={20} />
         </button>
 
-        <h2 className="text-2xl font-bold mb-6" id="checkout-dialog-title">
+        <h2 className="text-2xl font-bold mb-6">
           {type === 'words' ? 'Buy Word Packs' : 'Get Tokens'}
         </h2>
 

@@ -15,7 +15,7 @@ dotenv.config();
 
 // Create Express app
 const app = express();
-const port = process.env.PORT || 3001; // Use port 3001 by default to avoid conflicts
+const port = process.env.PORT || 3000;
 
 // Configure CORS to allow requests from any origin
 app.use(cors({
@@ -96,12 +96,12 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check endpoint - handle both paths for compatibility
-app.get(['/health', '/api/health'], (req, res) => {
+// Health check endpoint
+app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Create a checkout session - handle both paths for compatibility
+// Create a checkout session - handle both /api/create-checkout-session and /create-checkout-session
 app.post(['/api/create-checkout-session', '/create-checkout-session'], async (req, res) => {
   try {
     console.log('Received checkout request:', req.body);
@@ -149,7 +149,7 @@ app.post(['/api/create-checkout-session', '/create-checkout-session'], async (re
   }
 });
 
-// Verify a purchase - handle both paths for compatibility
+// Verify a purchase - handle both /api/verify-purchase/:sessionId and /verify-purchase/:sessionId
 app.get(['/api/verify-purchase/:sessionId', '/verify-purchase/:sessionId'], async (req, res) => {
   try {
     console.log('Verifying purchase:', req.params);
@@ -187,35 +187,14 @@ app.get(['/api/verify-purchase/:sessionId', '/verify-purchase/:sessionId'], asyn
   }
 });
 
-// Webhook to handle Stripe events - handle both paths for compatibility
+// Webhook to handle Stripe events
 app.post(['/api/webhook', '/webhook'], (req, res) => {
   console.log('Received webhook event');
   res.json({ received: true });
 });
 
-// Start the server with error handling
-const startServer = () => {
-  try {
-    const server = app.listen(port, '0.0.0.0', () => {
-      console.log(`Server running on http://localhost:${port}`);
-      console.log(`API server initialized in simulation mode`);
-    });
-
-    // Handle server errors
-    server.on('error', (error) => {
-      if (error.code === 'EADDRINUSE') {
-        console.error(`Port ${port} is already in use. Trying port ${port + 1}...`);
-        // Try the next port
-        process.env.PORT = port + 1;
-        startServer();
-      } else {
-        console.error('Server error:', error);
-      }
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-  }
-};
-
 // Start the server
-startServer();
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on http://localhost:${port}`);
+  console.log(`API server initialized in simulation mode`);
+});

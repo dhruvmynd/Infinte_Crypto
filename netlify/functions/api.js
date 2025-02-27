@@ -19,9 +19,6 @@ app.use(bodyParser.json());
 // Log all incoming requests
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  
-  // Ensure proper content type for all responses
-  res.setHeader('Content-Type', 'application/json');
   next();
 });
 
@@ -81,21 +78,16 @@ app.get('/', (req, res) => {
     message: 'Infinite Ideas API Server',
     version: '1.0.0',
     endpoints: [
-      '/create-checkout-session',
-      '/verify-purchase/:sessionId',
+      '/api/create-checkout-session',
+      '/api/verify-purchase/:sessionId',
       '/api/webhook',
       '/health'
     ]
   });
 });
 
-// Health check endpoint - handle both paths for compatibility
-app.get(['/health', '/api/health'], (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// Create a checkout session - handle both paths for compatibility
-app.post(['/api/create-checkout-session', '/create-checkout-session'], async (req, res) => {
+// Create a checkout session
+app.post('/api/create-checkout-session', async (req, res) => {
   try {
     console.log('Received checkout request:', req.body);
     const { packId, packType, userId } = req.body;
@@ -142,8 +134,8 @@ app.post(['/api/create-checkout-session', '/create-checkout-session'], async (re
   }
 });
 
-// Verify a purchase - handle both paths for compatibility
-app.get(['/api/verify-purchase/:sessionId', '/verify-purchase/:sessionId'], async (req, res) => {
+// Verify a purchase
+app.get('/api/verify-purchase/:sessionId', async (req, res) => {
   try {
     console.log('Verifying purchase:', req.params);
     const { sessionId } = req.params;
@@ -180,24 +172,15 @@ app.get(['/api/verify-purchase/:sessionId', '/verify-purchase/:sessionId'], asyn
   }
 });
 
-// Webhook to handle Stripe events - handle both paths for compatibility
-app.post(['/api/webhook', '/webhook'], (req, res) => {
+// Webhook to handle Stripe events
+app.post('/api/webhook', (req, res) => {
   console.log('Received webhook event');
   res.json({ received: true });
 });
 
-// Handle OPTIONS requests for CORS preflight
-app.options('*', cors());
-
-// Handle 404 errors
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not Found', path: req.path });
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(500).json({ error: 'Internal Server Error', message: err.message });
+// Simple health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Export the serverless function
