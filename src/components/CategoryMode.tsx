@@ -12,6 +12,7 @@ interface CategoryTarget {
   velocity: { x: number; y: number };
   isHovering1: boolean;
   isHovering2: boolean;
+  completed: boolean;
 }
 
 interface CategoryModeProps {
@@ -28,7 +29,7 @@ const DEFAULT_TARGETS = [
     finalWord: 'Steam',
     element1: null,
     element2: null,
-    icon: '💨',
+    icon: '♨️',
     combinedFrom: ['Water', 'Fire']
   },
   {
@@ -79,7 +80,8 @@ export function CategoryMode({ containerRef, onDrop, isTimerActive, isTimeUp, on
           y: (Math.random() - 0.5) * 0.5
         },
         isHovering1: false,
-        isHovering2: false
+        isHovering2: false,
+        completed: false
       }));
     };
 
@@ -138,8 +140,17 @@ export function CategoryMode({ containerRef, onDrop, isTimerActive, isTimeUp, on
   }, [containerRef, isTimeUp]);
 
   useEffect(() => {
-    onScoreChange(score, targets.length);
-  }, [score, targets.length, onScoreChange]);
+    // Count completed targets
+    const completedCount = targets.filter(target => 
+      target.element1 && target.element2
+    ).length;
+    
+    // Update score
+    setScore(completedCount);
+    
+    // Notify parent component about score change
+    onScoreChange(completedCount, targets.length);
+  }, [targets, onScoreChange]);
 
   const handleDragOver = (e: React.DragEvent, target: CategoryTarget, slotIndex: 1 | 2) => {
     e.preventDefault();
@@ -195,12 +206,13 @@ export function CategoryMode({ containerRef, onDrop, isTimerActive, isTimeUp, on
           element2: slotIndex === 2 ? itemName : t.element2
         };
 
-        // Check if both elements are correct
-        if (newTarget.element1 && newTarget.element2) {
-          setScore(prev => prev + 1);
-        }
-
-        return newTarget;
+        // Check if both elements are correct and mark as completed
+        const isCompleted = newTarget.element1 && newTarget.element2;
+        
+        return {
+          ...newTarget,
+          completed: isCompleted
+        };
       }
       return t;
     }));
@@ -246,12 +258,20 @@ export function CategoryMode({ containerRef, onDrop, isTimerActive, isTimeUp, on
           <div className="relative">
             {/* Glow effect */}
             <div 
-              className="absolute inset-0 bg-purple-500/10 blur-xl rounded-full"
+              className={`absolute inset-0 blur-xl rounded-full ${
+                target.completed 
+                  ? 'bg-green-500/20' 
+                  : 'bg-purple-500/10'
+              }`}
               style={{ width: '200px', height: '200px', transform: 'translate(-50%, -50%)' }}
             />
             
             {/* Target container */}
-            <div className="relative bg-white/10 backdrop-blur-sm border border-purple-500/20 rounded-xl p-6 shadow-lg">
+            <div className={`relative backdrop-blur-sm border rounded-xl p-6 shadow-lg ${
+              target.completed 
+                ? 'bg-green-500/10 border-green-500/30' 
+                : 'bg-white/10 border-purple-500/20'
+            }`}>
               <div className="flex items-center gap-4 mb-4">
                 <span className="text-2xl">{target.icon}</span>
                 <span className="text-xl font-medium">{target.finalWord}</span>

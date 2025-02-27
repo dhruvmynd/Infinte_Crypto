@@ -240,7 +240,7 @@ export default function ElementList({
                 isActive={isTimerActive}
               />
               <div className="text-lg font-medium text-center">
-                Score: {score} {selectedMode === 'Category' && `/ ${totalTargets}`}
+                Score: {score || 0} {selectedMode === 'Category' && `/ ${totalTargets || 4}`}
               </div>
               {isTimeUp && (
                 <div className="mt-2">
