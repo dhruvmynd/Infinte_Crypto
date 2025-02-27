@@ -12,7 +12,10 @@
     "health-check": "node health-check.js",
     "deploy": "node netlify-deploy.js",
     "check-deployment": "node deployment-check.js",
-    "postbuild": "cd netlify/functions && npm install"
+    "postbuild": "cd netlify/functions && npm install",
+    "test:api": "node api-test.js",
+    "test:stripe": "node stripe-test.js",
+    "test:deployment": "node deployment-check-improved.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.7",

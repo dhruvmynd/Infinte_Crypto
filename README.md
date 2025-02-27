@@ -49,10 +49,38 @@ Start the backend server (for Stripe integration):
 npm run server
 ```
 
+### Testing
+
+Test the API endpoints:
+
+```bash
+npm run test:api http://localhost:3000
+```
+
+Test the Stripe integration:
+
+```bash
+npm run test:stripe http://localhost:3000
+```
+
 ### Building for Production
 
 ```bash
 npm run build
+```
+
+### Deployment
+
+Deploy to Netlify:
+
+```bash
+npm run deploy
+```
+
+Check deployment status:
+
+```bash
+npm run test:deployment https://your-site.netlify.app
 ```
 
 ## Stripe Integration

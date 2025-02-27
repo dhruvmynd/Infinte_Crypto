@@ -77,12 +77,22 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'Infinite Ideas API Server',
     version: '1.0.0',
+    environment: 'netlify',
     endpoints: [
       '/api/create-checkout-session',
       '/api/verify-purchase/:sessionId',
       '/api/webhook',
       '/health'
     ]
+  });
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    environment: 'netlify'
   });
 });
 
@@ -176,11 +186,6 @@ app.get('/api/verify-purchase/:sessionId', async (req, res) => {
 app.post('/api/webhook', (req, res) => {
   console.log('Received webhook event');
   res.json({ received: true });
-});
-
-// Simple health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Export the serverless function

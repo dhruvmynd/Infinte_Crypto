@@ -5,6 +5,8 @@ import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { createServer } from 'http';
+import { once } from 'events';
 
 // Get current file path (ES modules don't have __dirname)
 const __filename = fileURLToPath(import.meta.url);
@@ -15,7 +17,8 @@ dotenv.config();
 
 // Create Express app
 const app = express();
-const port = process.env.PORT || 3000;
+const DEFAULT_PORT = 3000;
+let port = process.env.PORT || DEFAULT_PORT;
 
 // Configure CORS to allow requests from any origin
 app.use(cors({
@@ -99,6 +102,11 @@ app.get('/', (req, res) => {
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Add API health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'api' });
 });
 
 // Create a checkout session - handle both /api/create-checkout-session and /create-checkout-session
@@ -193,8 +201,71 @@ app.post(['/api/webhook', '/webhook'], (req, res) => {
   res.json({ received: true });
 });
 
+// Function to check if a port is available
+async function isPortAvailable(port) {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.once('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(false);
+      } else {
+        resolve(true);
+      }
+    });
+    
+    server.once('listening', () => {
+      server.close();
+      resolve(true);
+    });
+    
+    server.listen(port, '0.0.0.0');
+  });
+}
+
+// Function to find an available port
+async function findAvailablePort(startPort) {
+  let currentPort = startPort;
+  const MAX_PORT = startPort + 10; // Try up to 10 ports
+  
+  while (currentPort < MAX_PORT) {
+    if (await isPortAvailable(currentPort)) {
+      return currentPort;
+    }
+    currentPort++;
+  }
+  
+  throw new Error(`Could not find an available port between ${startPort} and ${MAX_PORT-1}`);
+}
+
+// Start the server with port checking
+async function startServer() {
+  try {
+    // Check if the default port is available, otherwise find another one
+    if (!(await isPortAvailable(port))) {
+      console.log(`Port ${port} is already in use, looking for an available port...`);
+      port = await findAvailablePort(port + 1);
+    }
+    
+    const server = app.listen(port, '0.0.0.0', () => {
+      console.log(`Server running on http://localhost:${port}`);
+      console.log(`API server initialized in simulation mode`);
+    });
+    
+    // Handle graceful shutdown
+    process.on('SIGINT', () => {
+      console.log('Shutting down server...');
+      server.close(() => {
+        console.log('Server shut down successfully');
+        process.exit(0);
+      });
+    });
+    
+    return server;
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
 // Start the server
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Server running on http://localhost:${port}`);
-  console.log(`API server initialized in simulation mode`);
-});
+startServer();
