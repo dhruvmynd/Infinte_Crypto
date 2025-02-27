@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShoppingBag, Clock, Lightbulb, Sparkles, Loader2 } from 'lucide-react';
 import { CheckoutModal } from './CheckoutModal';
 import { usePurchases } from '../hooks/usePurchases';
+import { useTokens } from '../hooks/useTokens';
 import { Toast } from './Toast';
 
 interface PowerUpsPanelProps {
@@ -15,6 +16,7 @@ export function PowerUpsPanel({ onBuyWords, onGetTokens }: PowerUpsPanelProps) {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'loading' } | null>(null);
   
   const { totals } = usePurchases();
+  const { tokenBalance, useTokens, hasEnoughTokens } = useTokens();
 
   const handleBuyWords = () => {
     setCheckoutType('words');
@@ -29,20 +31,25 @@ export function PowerUpsPanel({ onBuyWords, onGetTokens }: PowerUpsPanelProps) {
   };
 
   const handleUseHint = () => {
-    if (totals.tokens < 10) {
+    const hintCost = 10; // 10 tokens for a hint
+    
+    if (!hasEnoughTokens(hintCost)) {
       setToast({
-        message: 'Not enough tokens! You need 10 tokens to use a hint.',
+        message: `Not enough tokens! You need ${hintCost} tokens to use a hint.`,
         type: 'error'
       });
       setTimeout(() => setToast(null), 3000);
       return;
     }
     
-    setToast({
-      message: 'Hint used! 10 tokens deducted.',
-      type: 'success'
-    });
-    setTimeout(() => setToast(null), 3000);
+    // Use tokens and show success message if successful
+    if (useTokens(hintCost)) {
+      setToast({
+        message: `Hint used! ${hintCost} tokens deducted.`,
+        type: 'success'
+      });
+      setTimeout(() => setToast(null), 3000);
+    }
   };
 
   return (
@@ -89,11 +96,7 @@ export function PowerUpsPanel({ onBuyWords, onGetTokens }: PowerUpsPanelProps) {
           </div>
           <span className="text-xs text-center">Tokens</span>
           <span className="text-xs font-bold">
-            {totals.isLoading ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              totals.tokens
-            )}
+            {tokenBalance}
           </span>
         </div>
       </div>

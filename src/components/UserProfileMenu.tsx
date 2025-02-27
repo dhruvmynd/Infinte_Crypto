@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, ChevronDown } from 'lucide-react';
+import { LogOut, User, ChevronDown, Sparkles } from 'lucide-react';
 import { useAddress, useDisconnect } from "@thirdweb-dev/react";
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
+import { useTokens } from '../hooks/useTokens';
 
 export function UserProfileMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -13,6 +14,7 @@ export function UserProfileMenu() {
   const disconnect = useDisconnect();
   const { user } = useAuth();
   const { profile } = useProfile();
+  const { tokenBalance, isLoading: tokensLoading } = useTokens();
 
   const handleSignOut = async () => {
     if (address) {
@@ -38,6 +40,10 @@ export function UserProfileMenu() {
         <span className="text-sm font-medium max-w-[150px] truncate">
           {displayName}
         </span>
+        <div className="flex items-center gap-1 bg-purple-600/80 px-2 py-0.5 rounded-full">
+          <Sparkles size={12} className="text-white" />
+          <span className="text-xs font-bold text-white">{tokensLoading ? '...' : tokenBalance}</span>
+        </div>
         <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
