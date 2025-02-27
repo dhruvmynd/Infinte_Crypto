@@ -70,6 +70,8 @@ export function useTokens() {
           ? currentBalance + amount 
           : Math.max(0, currentBalance - amount);
 
+        console.log(`Updating token balance: ${currentBalance} ${operation === 'add' ? '+' : '-'} ${amount} = ${newBalance}`);
+
         // Update token balance
         const { error: updateError } = await supabase
           .from('profiles')
@@ -117,6 +119,7 @@ export function useTokens() {
   // Add tokens
   const addTokens = (amount: number) => {
     if (!userId || amount <= 0) return;
+    console.log(`Adding ${amount} tokens to user ${userId}`);
     updateTokenBalance({ amount, operation: 'add' });
   };
 

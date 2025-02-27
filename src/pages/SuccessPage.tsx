@@ -6,12 +6,14 @@ import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
 import { verifyPurchase } from '../lib/stripe';
 import { Toast } from '../components/Toast';
+import { useTokens } from '../hooks/useTokens';
 
 export function SuccessPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { profile } = useProfile();
+  const { addTokens } = useTokens();
   const [loading, setLoading] = useState(true);
   const [purchaseDetails, setPurchaseDetails] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'loading' } | null>(null);
@@ -75,6 +77,11 @@ export function SuccessPage() {
                 if (error) {
                   console.error('Error updating purchase record:', error);
                 }
+                
+                // Add tokens to user's balance if this is a token purchase
+                if (result.packType === 'tokens') {
+                  addTokens(result.amount);
+                }
               } catch (dbError) {
                 console.error('Database error:', dbError);
               }
@@ -94,6 +101,11 @@ export function SuccessPage() {
           console.log('Using URL parameters as fallback due to error');
           setPurchaseDetails(fallbackDetails);
           
+          // Add tokens to user's balance if this is a token purchase (fallback)
+          if (fallbackDetails.packType === 'tokens' && profile?.id) {
+            addTokens(fallbackDetails.amount);
+          }
+          
           setToast({
             message: 'Unable to verify purchase. Please contact support if items are not added.',
             type: 'error'
@@ -102,12 +114,19 @@ export function SuccessPage() {
       } catch (err) {
         console.error('Error in verification process:', err);
         // Use URL parameters as absolute fallback
-        setPurchaseDetails({
+        const fallbackDetails = {
           pack_id: packId || 'unknown',
           amount: amount ? parseInt(amount, 10) : 0,
           status: 'completed',
           packType: packId?.includes('token') ? 'tokens' : 'words'
-        });
+        };
+        
+        setPurchaseDetails(fallbackDetails);
+        
+        // Add tokens to user's balance if this is a token purchase (absolute fallback)
+        if (fallbackDetails.packType === 'tokens' && profile?.id) {
+          addTokens(fallbackDetails.amount);
+        }
         
         setToast({
           message: 'Error processing purchase. Please contact support.',
@@ -132,7 +151,7 @@ export function SuccessPage() {
         type: 'error'
       });
     }
-  }, [sessionId, navigate, profile?.id, packId, amount]);
+  }, [sessionId, navigate, profile?.id, packId, amount, addTokens]);
 
   const handleContinue = () => {
     navigate('/infinite_ideas');
