@@ -97,7 +97,7 @@ app.get('/health', (req, res) => {
 });
 
 // Create a checkout session
-app.post('/api/create-checkout-session', async (req, res) => {
+app.post('/create-checkout-session', async (req, res) => {
   try {
     console.log('Received checkout request:', req.body);
     const { packId, packType, userId } = req.body;
@@ -145,7 +145,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
 });
 
 // Verify a purchase
-app.get('/api/verify-purchase/:sessionId', async (req, res) => {
+app.get('/verify-purchase/:sessionId', async (req, res) => {
   try {
     console.log('Verifying purchase:', req.params);
     const { sessionId } = req.params;
@@ -183,10 +183,17 @@ app.get('/api/verify-purchase/:sessionId', async (req, res) => {
 });
 
 // Webhook to handle Stripe events
-app.post('/api/webhook', (req, res) => {
+app.post('/webhook', (req, res) => {
   console.log('Received webhook event');
   res.json({ received: true });
 });
 
+// Handle API routes
+app.use('/api', (req, res, next) => {
+  // Strip /api prefix and continue
+  req.url = req.url.replace(/^\/api/, '');
+  next();
+});
+
 // Export the serverless function
-module.exports.handler = serverless(app);
+exports.handler = serverless(app);
