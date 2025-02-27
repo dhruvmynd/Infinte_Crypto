@@ -72,7 +72,7 @@ const TOKEN_PACKAGES = [
   }
 ];
 
-// Root endpoint
+// Root endpoint - handle both direct and /api/ prefixed routes
 app.get(['/', '/api'], (req, res) => {
   res.json({ 
     message: 'Infinite Ideas API Server',
