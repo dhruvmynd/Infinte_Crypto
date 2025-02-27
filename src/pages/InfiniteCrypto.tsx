@@ -5,6 +5,7 @@ import { useCanvas } from '../hooks/useCanvas';
 import { useElementCombiner } from '../hooks/useElementCombiner';
 import { useBackgrounds } from '../hooks/useBackgrounds';
 import { useGameStats } from '../hooks/useGameStats';
+import { useUserElements } from '../hooks/useUserElements';
 import ElementList from '../components/ElementList';
 import { AuthHeader } from '../components/AuthHeader';
 import { CategoryMode } from '../components/CategoryMode';
@@ -35,6 +36,7 @@ function InfiniteCrypto() {
   const { profile } = useProfile();
   const { currentLanguage } = useLanguage();
   const { gameStats, updateScore, incrementScore } = useGameStats();
+  const { savedElements, saveUserElements, isLoading: elementsLoading } = useUserElements();
   const isDraggingRef = useRef(false);
   const dragStartPositionRef = useRef<{ x: number; y: number } | null>(null);
   const soundEffects = useRef<SoundEffects>();
@@ -44,6 +46,7 @@ function InfiniteCrypto() {
   const [isTimeUp, setIsTimeUp] = useState(false);
   const [score, setScore] = useState(0);
   const [totalGeneratedWords, setTotalGeneratedWords] = useState(0);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const getElementName = (item: DraggableItem) => {
     return item.translations?.[currentLanguage] || item.name;
@@ -62,6 +65,51 @@ function InfiniteCrypto() {
     canCombine,
     getValidCombination
   } = useElementCombiner();
+
+  // Load saved elements when user logs in
+  useEffect(() => {
+    if (!elementsLoading && savedElements.length > 0) {
+      // Merge base elements with saved elements
+      const mergedItems = [...baseElements];
+      
+      // Add saved elements that don't already exist
+      savedElements.forEach(savedElement => {
+        const exists = mergedItems.some(item => 
+          item.name === savedElement.name && !item.isBaseElement
+        );
+        
+        if (!exists) {
+          // Reset position to null so they appear in the list
+          mergedItems.push({
+            ...savedElement,
+            position: null
+          });
+        }
+      });
+      
+      setItems(mergedItems);
+    }
+  }, [savedElements, elementsLoading]);
+
+  // Save elements when they change
+  useEffect(() => {
+    // Debounce saving to avoid too many requests
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    if (profile?.id && items.length > baseElements.length) {
+      saveTimeoutRef.current = setTimeout(() => {
+        saveUserElements(items);
+      }, 2000); // Save after 2 seconds of inactivity
+    }
+    
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [items, profile?.id, saveUserElements]);
 
   useEffect(() => {
     soundEffects.current = new SoundEffects();
