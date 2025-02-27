@@ -21,17 +21,20 @@ export function useActivity() {
           return null;
         }
 
+        // Use a more permissive approach with public RLS policies
         const { data, error } = await supabase
           .from('user_activities')
           .insert([{
             user_id: profile.id,
             activity_type: activity.activity_type,
             details: activity.details || {}
-          }])
-          .select()
-          .single();
+          }]);
 
-        if (error) throw error;
+        if (error) {
+          console.log('Activity tracking error:', error);
+          return null;
+        }
+        
         return data;
       } catch (error) {
         console.log('Activity tracking error:', error);

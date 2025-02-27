@@ -39,17 +39,18 @@ export function FeedbackButton() {
       // Insert feedback into Supabase
       const { error } = await supabase
         .from('user_feedback')
-        .insert([
-          {
-            user_id: userId,
-            user_identifier: userIdentifier,
-            feedback: feedback.trim(),
-            category,
-            created_at: new Date().toISOString()
-          }
-        ]);
+        .insert([{
+          user_id: userId,
+          user_identifier: userIdentifier,
+          feedback: feedback.trim(),
+          category,
+          created_at: new Date().toISOString()
+        }]);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw new Error('Database error: ' + error.message);
+      }
       
       // Show success message
       setToast({
@@ -103,7 +104,7 @@ export function FeedbackButton() {
             </button>
             
             <div className="p-6">
-              <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Share Your Feedback</h2>
+              <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white" id="feedback-dialog-title">Share Your Feedback</h2>
               
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>

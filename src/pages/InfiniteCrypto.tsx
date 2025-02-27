@@ -4,6 +4,7 @@ import { SoundEffects } from '../sounds';
 import { useCanvas } from '../hooks/useCanvas';
 import { useElementCombiner } from '../hooks/useElementCombiner';
 import { useBackgrounds } from '../hooks/useBackgrounds';
+import { useGameStats } from '../hooks/useGameStats';
 import ElementList from '../components/ElementList';
 import { AuthHeader } from '../components/AuthHeader';
 import { CategoryMode } from '../components/CategoryMode';
@@ -33,6 +34,7 @@ function InfiniteCrypto() {
   const address = useAddress();
   const { profile } = useProfile();
   const { currentLanguage } = useLanguage();
+  const { gameStats, updateScore, incrementScore } = useGameStats();
   const isDraggingRef = useRef(false);
   const dragStartPositionRef = useRef<{ x: number; y: number } | null>(null);
   const soundEffects = useRef<SoundEffects>();
@@ -139,6 +141,13 @@ function InfiniteCrypto() {
   const handleTimeEnd = () => {
     setIsTimeUp(true);
     setIsTimerActive(false);
+    
+    // Update game stats when time is up
+    if (selectedMode === 'Timed') {
+      updateScore('timed', totalGeneratedWords);
+    } else if (selectedMode === 'Category') {
+      updateScore('category', score);
+    }
   };
 
   // Handle clicking on elements in the list
@@ -234,7 +243,10 @@ function InfiniteCrypto() {
         ];
       });
 
-      if (selectedMode === 'Timed' && isTimerActive) {
+      // Update game stats based on the current mode
+      if (selectedMode === 'Basic') {
+        incrementScore('basic');
+      } else if (selectedMode === 'Timed' && isTimerActive) {
         setScore(prev => prev + 1);
         setTotalGeneratedWords(prev => prev + 1);
       }
@@ -544,18 +556,18 @@ function InfiniteCrypto() {
             onElementClick={handleElementClick}
             onBuyWords={handleBuyWords}
             onGetTokens={handleGetTokens}
+            gameStats={gameStats}
           />
         </div>
       </div>
       
+      <FeedbackButton />
+
       <CheckoutModal 
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
         type={checkoutType}
       />
-
-      {/* Feedback Button */}
-      <FeedbackButton />
     </div>
   );
 }

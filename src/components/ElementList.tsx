@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, X, Play, Timer, ShoppingBag, Lightbulb, Sparkles, Clock, Target, Users, Gamepad2, Loader2 } from 'lucide-react';
+import { Search, X, Play, Timer, ShoppingBag, Lightbulb, Sparkles, Clock, Target, Users, Gamepad2, Loader2, Trophy } from 'lucide-react';
 import { DraggableItem } from '../types';
 import { useProfile } from '../hooks/useProfile';
 import { useAuth } from '../hooks/useAuth';
@@ -8,6 +8,7 @@ import { useLanguage } from '../hooks/useLanguage';
 import { usePurchases } from '../hooks/usePurchases';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from '../constants';
 import { Timer as TimerComponent } from './Timer';
+import { ScoreDisplay } from './ScoreDisplay';
 
 interface ElementListProps {
   items: DraggableItem[];
@@ -27,6 +28,12 @@ interface ElementListProps {
   onElementClick: (item: DraggableItem) => void;
   onBuyWords: () => void;
   onGetTokens: () => void;
+  gameStats?: {
+    basic_score: number;
+    timed_score: number;
+    category_score: number;
+    one_vs_one_score: number;
+  };
 }
 
 const LANGUAGE_NAMES: Record<SupportedLanguage, string> = {
@@ -38,10 +45,10 @@ const LANGUAGE_NAMES: Record<SupportedLanguage, string> = {
 };
 
 const MODES = [
-  { id: 'Basic', icon: Gamepad2, label: 'Basic Mode' },
-  { id: 'Timed', icon: Clock, label: 'Timed Mode' },
-  { id: 'Category', icon: Target, label: 'Category Mode' },
-  { id: '1v1', icon: Users, label: '1v1 Mode' }
+  { id: 'Basic', icon: Gamepad2, label: 'Basic Mode', disabled: false },
+  { id: 'Timed', icon: Clock, label: 'Timed Mode', disabled: false },
+  { id: 'Category', icon: Target, label: 'Category Mode', disabled: false },
+  { id: '1v1', icon: Users, label: '1v1 Mode (Coming Soon)', disabled: true }
 ] as const;
 
 export default function ElementList({ 
@@ -61,9 +68,16 @@ export default function ElementList({
   totalTargets,
   onElementClick,
   onBuyWords,
-  onGetTokens
+  onGetTokens,
+  gameStats = {
+    basic_score: 0,
+    timed_score: 0,
+    category_score: 0,
+    one_vs_one_score: 0
+  }
 }: ElementListProps) {
   const [selectedElement, setSelectedElement] = useState<DraggableItem | null>(null);
+  const [showStats, setShowStats] = useState(true);
   const { profile } = useProfile();
   const { user } = useAuth();
   const { calculateRarity } = useRarity();
@@ -89,6 +103,16 @@ export default function ElementList({
     return acc;
   }, []);
 
+  // Count unique discovered elements
+  const uniqueDiscoveredCount = generatedElements.length;
+  
+  // Estimate total possible elements (this is just an example, adjust as needed)
+  const totalPossibleElements = 50; // This could be a fixed number or calculated dynamically
+  const remainingElements = Math.max(0, totalPossibleElements - uniqueDiscoveredCount);
+  
+  // Calculate progress percentage
+  const progressPercentage = Math.min(100, Math.round((uniqueDiscoveredCount / totalPossibleElements) * 100));
+
   const filteredBaseElements = baseElements.filter(item => 
     getElementName(item).toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -103,6 +127,14 @@ export default function ElementList({
     if (deleteMode || selectedMode === 'Category') return;
     setSelectedElement(selectedElement?.id === element.id ? null : element);
     onElementClick(element);
+  };
+
+  const handleModeChange = (mode: 'Basic' | 'Timed' | 'Category' | '1v1') => {
+    // Don't allow selecting 1v1 mode since it's disabled
+    if (mode === '1v1') {
+      return;
+    }
+    onModeChange(mode);
   };
 
   const renderRarityIndicator = (name: string) => {
@@ -145,21 +177,49 @@ export default function ElementList({
     <div className="w-96 shrink-0 bg-gray-100 dark:bg-gray-900 p-4 rounded-lg flex flex-col h-full transition-colors duration-200">
       {/* Game Mode Selection */}
       <div className="grid grid-cols-4 gap-2 mb-4">
-        {MODES.map(({ id, icon: Icon, label }) => (
+        {MODES.map(({ id, icon: Icon, label, disabled }) => (
           <button
             key={id}
-            onClick={() => onModeChange(id)}
+            onClick={() => !disabled && handleModeChange(id)}
             className={`flex flex-col items-center justify-center p-3 rounded-lg transition-colors ${
               id === selectedMode
                 ? 'bg-blue-500 text-white'
+                : disabled
+                ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed'
                 : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
             title={label}
+            disabled={disabled}
           >
             <Icon size={20} />
+            {disabled && (
+              <span className="text-xs mt-1 text-gray-500 dark:text-gray-500">Soon</span>
+            )}
           </button>
         ))}
       </div>
+
+      {/* Stats Display */}
+      <div className="mb-4">
+        <button
+          onClick={() => setShowStats(!showStats)}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white rounded-lg transition-colors"
+        >
+          <Trophy size={16} />
+          <span>{showStats ? 'Hide Stats' : 'Show Stats'}</span>
+        </button>
+      </div>
+
+      {showStats && (
+        <div className="mb-4">
+          <ScoreDisplay 
+            basicScore={gameStats.basic_score}
+            timedScore={gameStats.timed_score}
+            categoryScore={gameStats.category_score}
+            oneVsOneScore={gameStats.one_vs_one_score}
+          />
+        </div>
+      )}
 
       {/* Timer/Challenge Section */}
       {(selectedMode === 'Category' || selectedMode === 'Timed') && (
@@ -311,11 +371,14 @@ export default function ElementList({
 
           <div className="mb-4">
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div className="bg-purple-500 h-2 rounded-full" style={{ width: '60%' }}></div>
+              <div 
+                className="bg-purple-500 h-2 rounded-full" 
+                style={{ width: `${progressPercentage}%` }}
+              ></div>
             </div>
             <div className="flex justify-between text-sm mt-1">
-              <span>30 Found</span>
-              <span>20 Remaining</span>
+              <span>{uniqueDiscoveredCount} Found</span>
+              <span>{remainingElements} Remaining</span>
             </div>
           </div>
 
