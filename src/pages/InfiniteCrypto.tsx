@@ -8,6 +8,7 @@ import ElementList from '../components/ElementList';
 import { AuthHeader } from '../components/AuthHeader';
 import { CategoryMode } from '../components/CategoryMode';
 import { CheckoutModal } from '../components/CheckoutModal';
+import { FeedbackButton } from '../components/FeedbackButton';
 import { DraggableItem } from '../types';
 import { baseElements, COMBINATION_DISTANCE } from '../constants';
 import { useAddress } from "@thirdweb-dev/react";
@@ -552,6 +553,9 @@ function InfiniteCrypto() {
         onClose={() => setIsCheckoutOpen(false)}
         type={checkoutType}
       />
+
+      {/* Feedback Button */}
+      <FeedbackButton />
     </div>
   );
 }
