@@ -23,31 +23,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Word pack definitions
-const WORD_PACKS = [
-  {
-    id: 'basic',
-    name: 'Basic Pack',
-    description: 'Get started with 10 new word combinations',
-    price: 499, // in cents
-    amount: 10
-  },
-  {
-    id: 'pro',
-    name: 'Pro Pack',
-    description: 'Unlock 25 new word combinations',
-    price: 999, // in cents
-    amount: 25
-  },
-  {
-    id: 'ultimate',
-    name: 'Ultimate Pack',
-    description: 'Master the game with 50 new combinations',
-    price: 1999, // in cents
-    amount: 50
-  }
-];
-
 // Token package definitions
 const TOKEN_PACKAGES = [
   {
@@ -137,7 +112,7 @@ app.post(['/create-checkout-session', '/api/create-checkout-session'], async (re
       }));
     } else {
       // Standard package
-      const packages = packType === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
+      const packages = TOKEN_PACKAGES;
       packageDetails = packages.find(p => p.id === packId);
       
       if (!packageDetails) {
@@ -224,29 +199,23 @@ app.get(['/verify-purchase/:sessionId', '/api/verify-purchase/:sessionId'], asyn
     // Check if this is a simulated session
     if (sessionId.startsWith('sim_')) {
       // For simulated sessions, extract info from the session ID
-      const packId = sessionId.includes('basic') ? 'basic' : 
-                    sessionId.includes('pro') ? 'pro' : 
-                    sessionId.includes('ultimate') ? 'ultimate' : 
-                    sessionId.includes('starter') ? 'starter' : 
+      const packId = sessionId.includes('starter') ? 'starter' : 
                     sessionId.includes('plus') ? 'plus' : 
                     sessionId.includes('premium') ? 'premium' : 
                     sessionId.includes('custom') ? 'custom' : 'basic';
                     
       const isTokenPack = packId === 'starter' || packId === 'plus' || packId === 'premium';
       const isCustomPack = packId.includes('custom');
-      const packType = isTokenPack ? 'tokens' : isCustomPack ? 'custom_words' : 'words';
+      const packType = isTokenPack ? 'tokens' : isCustomPack ? 'custom_words' : 'custom_words';
       
       let amount = 0;
       if (isCustomPack) {
         const match = packId.match(/custom_(\d+)_words/);
         amount = match ? parseInt(match[1], 10) : 1;
       } else {
-        amount = packId === 'basic' ? 10 : 
-                packId === 'pro' ? 25 : 
-                packId === 'ultimate' ? 50 :
-                packId === 'starter' ? 100 :
+        amount = packId === 'starter' ? 100 :
                 packId === 'plus' ? 275 :
-                packId === 'premium' ? 600 : 10;
+                packId === 'premium' ? 600 : 1;
       }
       
       console.log('Simulated purchase verification:', { sessionId, packId, amount, packType });
@@ -295,29 +264,23 @@ app.get(['/verify-purchase/:sessionId', '/api/verify-purchase/:sessionId'], asyn
       console.error('Stripe error:', stripeError);
       
       // Fallback to simulated verification
-      const packId = sessionId.includes('basic') ? 'basic' : 
-                    sessionId.includes('pro') ? 'pro' : 
-                    sessionId.includes('ultimate') ? 'ultimate' : 
-                    sessionId.includes('starter') ? 'starter' : 
+      const packId = sessionId.includes('starter') ? 'starter' : 
                     sessionId.includes('plus') ? 'plus' : 
                     sessionId.includes('premium') ? 'premium' : 
                     sessionId.includes('custom') ? 'custom' : 'basic';
                     
       const isTokenPack = packId === 'starter' || packId === 'plus' || packId === 'premium';
       const isCustomPack = packId.includes('custom');
-      const packType = isTokenPack ? 'tokens' : isCustomPack ? 'custom_words' : 'words';
+      const packType = isTokenPack ? 'tokens' : isCustomPack ? 'custom_words' : 'custom_words';
       
       let amount = 0;
       if (isCustomPack) {
         const match = packId.match(/custom_(\d+)_words/);
         amount = match ? parseInt(match[1], 10) : 1;
       } else {
-        amount = packId === 'basic' ? 10 : 
-                packId === 'pro' ? 25 : 
-                packId === 'ultimate' ? 50 :
-                packId === 'starter' ? 100 :
+        amount = packId === 'starter' ? 100 :
                 packId === 'plus' ? 275 :
-                packId === 'premium' ? 600 : 10;
+                packId === 'premium' ? 600 : 1;
       }
       
       console.log('Fallback simulated purchase verification:', { sessionId, packId, amount, packType });

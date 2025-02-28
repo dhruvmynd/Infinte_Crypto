@@ -51,7 +51,7 @@ export function SuccessPage() {
           pack_id: packId || 'unknown',
           amount: amount ? parseInt(amount, 10) : 0,
           status: 'completed',
-          packType: isTokenPack ? 'tokens' : isCustomPack ? 'custom_words' : 'words'
+          packType: isTokenPack ? 'tokens' : isCustomPack ? 'custom_words' : 'custom_words'
         };
         
         try {
@@ -150,7 +150,7 @@ export function SuccessPage() {
           pack_id: packId || 'unknown',
           amount: amount ? parseInt(amount, 10) : 0,
           status: 'completed',
-          packType: isTokenPack ? 'tokens' : isCustomPack ? 'custom_words' : 'words'
+          packType: isTokenPack ? 'tokens' : isCustomPack ? 'custom_words' : 'custom_words'
         };
         
         setPurchaseDetails(fallbackDetails);
@@ -248,8 +248,8 @@ export function SuccessPage() {
             Thank you for your purchase. Your account has been credited with:
           </p>
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
-            <p className="text-xl font-bold">{purchaseDetails.amount} Words</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Pack: {purchaseDetails.pack_id}</p>
+            <p className="text-xl font-bold">{purchaseDetails.amount} Custom Words</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Custom selection</p>
           </div>
         </div>
       );

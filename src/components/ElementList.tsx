@@ -186,7 +186,7 @@ export default function ElementList({
                 ? 'bg-blue-500 text-white'
                 : disabled
                 ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed'
-                : 'bg-white dark:bg-gray- 800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
             title={label}
             disabled={disabled}
@@ -328,7 +328,7 @@ export default function ElementList({
               <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mb-1">
                 <ShoppingBag className="w-6 h-6 text-yellow-500" />
               </div>
-              <span className="text-xs text center">Word Packs</span>
+              <span className="text-xs text center">Custom Words</span>
               <span className="text-xs font-bold">
                 {totals.isLoading ? (
                   <Loader2 className="w-3 h-3 animate-spin" />

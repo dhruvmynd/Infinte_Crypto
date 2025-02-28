@@ -11,31 +11,6 @@ const STRIPE_PUBLIC_KEY = import.meta.env.VITE_STRIPE_PUBLIC_KEY || 'pk_test_51Q
 // API URL - use environment variable or default to relative path for production
 const API_URL = import.meta.env.VITE_API_URL || '';
 
-// Word pack definitions
-export const WORD_PACKS = [
-  {
-    id: 'basic',
-    name: 'Basic Pack',
-    description: 'Get started with 10 new word combinations',
-    price: 4.99,
-    amount: 10
-  },
-  {
-    id: 'pro',
-    name: 'Pro Pack',
-    description: 'Unlock 25 new word combinations',
-    price: 9.99,
-    amount: 25
-  },
-  {
-    id: 'ultimate',
-    name: 'Ultimate Pack',
-    description: 'Master the game with 50 new combinations',
-    price: 19.99,
-    amount: 50
-  }
-];
-
 // Token package definitions
 export const TOKEN_PACKAGES = [
   {
@@ -64,7 +39,7 @@ export const TOKEN_PACKAGES = [
 // Create a checkout session
 export const createCheckoutSession = async (
   packId: string, 
-  packType: 'words' | 'tokens' | 'custom_words',
+  packType: 'tokens' | 'custom_words',
   userId: string,
   selectedWords?: string[]
 ): Promise<StripeCheckoutSession> => {
@@ -136,20 +111,20 @@ export const createCheckoutSession = async (
 };
 
 // Helper function to get package amount
-function getPackageAmount(packId: string, packType: 'words' | 'tokens' | 'custom_words'): number {
+function getPackageAmount(packId: string, packType: 'tokens' | 'custom_words'): number {
   if (packType === 'custom_words') {
     // Extract the number of words from the custom pack ID (format: custom_X_words)
     const match = packId.match(/custom_(\d+)_words/);
     return match ? parseInt(match[1], 10) : 1;
   }
   
-  const packages = packType === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
+  const packages = TOKEN_PACKAGES;
   const packageDetails = packages.find(p => p.id === packId);
   return packageDetails?.amount || 0;
 }
 
 // Helper function to get package price
-function getPackagePrice(packId: string, packType: 'words' | 'tokens' | 'custom_words'): number {
+function getPackagePrice(packId: string, packType: 'tokens' | 'custom_words'): number {
   if (packType === 'custom_words') {
     // Extract the number of words from the custom pack ID (format: custom_X_words)
     const match = packId.match(/custom_(\d+)_words/);
@@ -157,7 +132,7 @@ function getPackagePrice(packId: string, packType: 'words' | 'tokens' | 'custom_
     return parseFloat((wordCount * 1.99).toFixed(2));
   }
   
-  const packages = packType === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
+  const packages = TOKEN_PACKAGES;
   const packageDetails = packages.find(p => p.id === packId);
   return packageDetails?.price || 0;
 }
@@ -183,7 +158,7 @@ export const verifyPurchase = async (sessionId: string): Promise<{
   isCompleted: boolean;
   packId: string;
   amount: number;
-  packType: 'words' | 'tokens' | 'custom_words';
+  packType: 'tokens' | 'custom_words';
   selectedWords?: string[];
 }> => {
   try {
@@ -246,22 +221,17 @@ export const verifyPurchase = async (sessionId: string): Promise<{
     console.error('Error verifying purchase:', error);
     
     // Extract packId from sessionId if possible
-    const packId = sessionId.includes('basic') ? 'basic' : 
-                  sessionId.includes('pro') ? 'pro' : 
-                  sessionId.includes('ultimate') ? 'ultimate' : 
-                  sessionId.includes('starter') ? 'starter' : 
+    const packId = sessionId.includes('starter') ? 'starter' : 
                   sessionId.includes('plus') ? 'plus' : 
                   sessionId.includes('premium') ? 'premium' : 
-                  sessionId.includes('custom') ? sessionId : 'basic';
+                  sessionId.includes('custom') ? sessionId : 'custom_1_words';
                   
     const isTokenPack = packId === 'starter' || packId === 'plus' || packId === 'premium';
     const isCustomPack = packId.includes('custom');
     
-    let packType: 'words' | 'tokens' | 'custom_words' = 'words';
+    let packType: 'tokens' | 'custom_words' = 'custom_words';
     if (isTokenPack) {
       packType = 'tokens';
-    } else if (isCustomPack) {
-      packType = 'custom_words';
     }
     
     let amount = 0;
@@ -269,12 +239,9 @@ export const verifyPurchase = async (sessionId: string): Promise<{
       const match = packId.match(/custom_(\d+)_words/);
       amount = match ? parseInt(match[1], 10) : 1;
     } else {
-      amount = packId === 'basic' ? 10 : 
-              packId === 'pro' ? 25 : 
-              packId === 'ultimate' ? 50 :
-              packId === 'starter' ? 100 :
+      amount = packId === 'starter' ? 100 :
               packId === 'plus' ? 275 :
-              packId === 'premium' ? 600 : 10;
+              packId === 'premium' ? 600 : 1;
     }
     
     // Update the purchase record in the database
@@ -369,7 +336,7 @@ export const useStripeCheckout = () => {
   const address = useAddress();
   const { addTokens } = useTokens();
   
-  const checkout = async (packId: string, packType: 'words' | 'tokens' | 'custom_words', selectedWords?: string[]) => {
+  const checkout = async (packId: string, packType: 'tokens' | 'custom_words', selectedWords?: string[]) => {
     if (!profile?.id && !user?.id && !address) {
       throw new Error('User must be logged in to make a purchase');
     }

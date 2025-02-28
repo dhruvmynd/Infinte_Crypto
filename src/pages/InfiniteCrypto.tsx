@@ -32,7 +32,7 @@ function InfiniteCrypto() {
   });
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isWordSelectionOpen, setIsWordSelectionOpen] = useState(false);
-  const [checkoutType, setCheckoutType] = useState<'words' | 'tokens'>('words');
+  const [checkoutType, setCheckoutType] = useState<'tokens'>('tokens');
   
   const address = useAddress();
   const { profile } = useProfile();
@@ -491,11 +491,6 @@ function InfiniteCrypto() {
     }
   };
 
-  const handleBuyWords = () => {
-    setCheckoutType('words');
-    setIsCheckoutOpen(true);
-  };
-
   const handleGetTokens = () => {
     setCheckoutType('tokens');
     setIsCheckoutOpen(true);
@@ -637,7 +632,7 @@ function InfiniteCrypto() {
       <CheckoutModal 
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
-        type={checkoutType}
+        type="tokens"
       />
 
       <WordSelectionModal

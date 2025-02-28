@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, CreditCard, Package, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
-import { useStripeCheckout, WORD_PACKS, TOKEN_PACKAGES } from '../lib/stripe';
+import { useStripeCheckout, TOKEN_PACKAGES } from '../lib/stripe';
 import { Toast } from './Toast';
 import { useAuth } from '../hooks/useAuth';
 import { useAddress } from "@thirdweb-dev/react";
@@ -10,7 +10,7 @@ import { checkSupabaseConnection, handleDatabaseError } from '../lib/supabase';
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
-  type: 'words' | 'tokens';
+  type: 'tokens';
 }
 
 export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
@@ -32,8 +32,8 @@ export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
   
   if (!isOpen) return null;
 
-  const packages = type === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
-  const icon = type === 'words' ? Package : Sparkles;
+  const packages = TOKEN_PACKAGES;
+  const icon = Sparkles;
 
   const isLoggedIn = !!user || !!address;
   const hasProfile = !!profile?.id;
@@ -66,7 +66,7 @@ export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
         throw new Error(connectionError?.message || 'Database connection issue. Please try again.');
       }
       
-      await checkout(packageId, type);
+      await checkout(packageId, 'tokens');
     } catch (err) {
       const errorMessage = err instanceof Error 
         ? handleDatabaseError(err, err.message)
@@ -91,7 +91,7 @@ export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
         </button>
 
         <h2 className="text-2xl font-bold mb-6">
-          {type === 'words' ? 'Buy Word Packs' : 'Get Tokens'}
+          Get Tokens
         </h2>
 
         {!isLoggedIn && (
@@ -115,11 +115,7 @@ export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
               className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
             >
               <div className="flex items-start gap-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                  type === 'words' 
-                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-500'
-                    : 'bg-purple-100 dark:bg-purple-900/30 text-purple-500'
-                }`}>
+                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-purple-100 dark:bg-purple-900/30 text-purple-500">
                   {React.createElement(icon, { size: 24 })}
                 </div>
                 <div className="flex-1">
