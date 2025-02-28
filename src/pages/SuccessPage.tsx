@@ -42,7 +42,7 @@ export function SuccessPage() {
           pack_id: packId || 'unknown',
           amount: amount ? parseInt(amount, 10) : 0,
           status: 'completed',
-          packType: packId?.includes('token') ? 'tokens' : 'words'
+          packType: packId?.includes('token') || packId?.includes('starter') || packId?.includes('plus') || packId?.includes('premium') ? 'tokens' : 'words'
         };
         
         try {
@@ -134,7 +134,7 @@ export function SuccessPage() {
           pack_id: packId || 'unknown',
           amount: amount ? parseInt(amount, 10) : 0,
           status: 'completed',
-          packType: packId?.includes('token') ? 'tokens' : 'words'
+          packType: packId?.includes('token') || packId?.includes('starter') || packId?.includes('plus') || packId?.includes('premium') ? 'tokens' : 'words'
         };
         
         setPurchaseDetails(fallbackDetails);

@@ -70,6 +70,7 @@ export const createCheckoutSession = async (
   try {
     console.log('Creating checkout session for user:', userId);
     console.log('API URL:', API_URL);
+    console.log('Pack type:', packType, 'Pack ID:', packId);
     
     // Call the server API to create a checkout session
     const response = await fetch(`${API_URL}/create-checkout-session`, {
@@ -263,6 +264,7 @@ export const updateUserTokens = async (userId: string, amount: number): Promise<
     
     console.log(`Current tokens: ${currentTokens}, New tokens: ${newTokens}`);
     
+    // Update the tokens in the ```
     // Update the tokens in the profile
     const { error: updateError } = await supabase
       .from('profiles')
