@@ -264,7 +264,6 @@ export const updateUserTokens = async (userId: string, amount: number): Promise<
     
     console.log(`Current tokens: ${currentTokens}, New tokens: ${newTokens}`);
     
-    // Update the tokens in the ```
     // Update the tokens in the profile
     const { error: updateError } = await supabase
       .from('profiles')
@@ -274,6 +273,23 @@ export const updateUserTokens = async (userId: string, amount: number): Promise<
     if (updateError) {
       console.error('Error updating tokens:', updateError);
       return false;
+    }
+    
+    // Log token transaction
+    try {
+      await supabase
+        .from('token_transactions')
+        .insert([{
+          user_id: userId,
+          amount: amount,
+          transaction_type: 'credit',
+          description: 'Tokens purchased',
+          previous_balance: currentTokens,
+          new_balance: newTokens
+        }]);
+    } catch (txError) {
+      console.error('Error logging token transaction:', txError);
+      // Continue even if transaction logging fails
     }
     
     console.log(`Successfully updated tokens for user ${userId}`);

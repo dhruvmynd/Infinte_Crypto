@@ -37,12 +37,19 @@ export function SuccessPage() {
       try {
         console.log('Verifying purchase with session ID:', sessionId);
         
+        // Determine if this is a token purchase based on pack ID
+        const isTokenPack = packId?.includes('starter') || 
+                           packId?.includes('plus') || 
+                           packId?.includes('premium');
+        
+        console.log('Is token pack:', isTokenPack, 'Pack ID:', packId);
+        
         // Use URL parameters as fallback if verification fails
         const fallbackDetails = {
           pack_id: packId || 'unknown',
           amount: amount ? parseInt(amount, 10) : 0,
           status: 'completed',
-          packType: packId?.includes('token') || packId?.includes('starter') || packId?.includes('plus') || packId?.includes('premium') ? 'tokens' : 'words'
+          packType: isTokenPack ? 'tokens' : 'words'
         };
         
         try {
@@ -130,11 +137,15 @@ export function SuccessPage() {
       } catch (err) {
         console.error('Error in verification process:', err);
         // Use URL parameters as absolute fallback
+        const isTokenPack = packId?.includes('starter') || 
+                           packId?.includes('plus') || 
+                           packId?.includes('premium');
+                           
         const fallbackDetails = {
           pack_id: packId || 'unknown',
           amount: amount ? parseInt(amount, 10) : 0,
           status: 'completed',
-          packType: packId?.includes('token') || packId?.includes('starter') || packId?.includes('plus') || packId?.includes('premium') ? 'tokens' : 'words'
+          packType: isTokenPack ? 'tokens' : 'words'
         };
         
         setPurchaseDetails(fallbackDetails);
