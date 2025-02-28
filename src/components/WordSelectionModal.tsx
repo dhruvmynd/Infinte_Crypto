@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShoppingCart, Check, Loader2, DollarSign } from 'lucide-react';
+import { X, ShoppingCart, Check, Loader2 } from 'lucide-react';
 import { useStripeCheckout } from '../lib/stripe';
 import { useProfile } from '../hooks/useProfile';
 import { DraggableItem } from '../types';

@@ -42,14 +42,16 @@ export function SuccessPage() {
                            packId?.includes('plus') || 
                            packId?.includes('premium');
         
-        console.log('Is token pack:', isTokenPack, 'Pack ID:', packId);
+        const isCustomPack = packId?.includes('custom');
+        
+        console.log('Is token pack:', isTokenPack, 'Is custom pack:', isCustomPack, 'Pack ID:', packId);
         
         // Use URL parameters as fallback if verification fails
         const fallbackDetails = {
           pack_id: packId || 'unknown',
           amount: amount ? parseInt(amount, 10) : 0,
           status: 'completed',
-          packType: isTokenPack ? 'tokens' : 'words'
+          packType: isTokenPack ? 'tokens' : isCustomPack ? 'custom_words' : 'words'
         };
         
         try {
@@ -62,7 +64,8 @@ export function SuccessPage() {
               pack_id: result.packId,
               amount: result.amount,
               status: 'completed',
-              packType: result.packType
+              packType: result.packType,
+              selectedWords: result.selectedWords
             });
             
             setToast({
@@ -140,12 +143,14 @@ export function SuccessPage() {
         const isTokenPack = packId?.includes('starter') || 
                            packId?.includes('plus') || 
                            packId?.includes('premium');
+        
+        const isCustomPack = packId?.includes('custom');
                            
         const fallbackDetails = {
           pack_id: packId || 'unknown',
           amount: amount ? parseInt(amount, 10) : 0,
           status: 'completed',
-          packType: isTokenPack ? 'tokens' : 'words'
+          packType: isTokenPack ? 'tokens' : isCustomPack ? 'custom_words' : 'words'
         };
         
         setPurchaseDetails(fallbackDetails);
@@ -192,6 +197,65 @@ export function SuccessPage() {
     navigate('/infinite_ideas');
   };
 
+  // Determine what to display based on purchase type
+  const renderPurchaseDetails = () => {
+    if (!purchaseDetails) return null;
+
+    if (purchaseDetails.packType === 'custom_words') {
+      return (
+        <div className="mb-6">
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
+            Thank you for your purchase. Your account has been credited with:
+          </p>
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
+            <p className="text-xl font-bold">{purchaseDetails.amount} Custom Words</p>
+            {purchaseDetails.selectedWords && purchaseDetails.selectedWords.length > 0 ? (
+              <div className="mt-2">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Selected words:</p>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {purchaseDetails.selectedWords.map((word: string, index: number) => (
+                    <span 
+                      key={index} 
+                      className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 rounded text-xs"
+                    >
+                      {word}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">Custom word selection</p>
+            )}
+          </div>
+        </div>
+      );
+    } else if (purchaseDetails.packType === 'tokens') {
+      return (
+        <div className="mb-6">
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
+            Thank you for your purchase. Your account has been credited with:
+          </p>
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
+            <p className="text-xl font-bold">{purchaseDetails.amount} Tokens</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Pack: {purchaseDetails.pack_id}</p>
+          </div>
+        </div>
+      );
+    } else {
+      return (
+        <div className="mb-6">
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
+            Thank you for your purchase. Your account has been credited with:
+          </p>
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
+            <p className="text-xl font-bold">{purchaseDetails.amount} Words</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Pack: {purchaseDetails.pack_id}</p>
+          </div>
+        </div>
+      );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-500 via-blue-500 to-green-500 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-2xl w-full max-w-md text-center">
@@ -203,20 +267,8 @@ export function SuccessPage() {
         
         {loading ? (
           <p className="text-gray-600 dark:text-gray-300 mb-6">Verifying your purchase...</p>
-        ) : purchaseDetails ? (
-          <div className="mb-6">
-            <p className="text-gray-600 dark:text-gray-300 mb-4">
-              Thank you for your purchase. Your account has been credited with:
-            </p>
-            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
-              <p className="text-xl font-bold">{purchaseDetails.amount} {purchaseDetails.packType === 'tokens' ? 'Tokens' : 'Words'}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Pack: {purchaseDetails.pack_id}</p>
-            </div>
-          </div>
         ) : (
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
-            We couldn't find your purchase details, but don't worry! If your payment was successful, your items will be added to your account.
-          </p>
+          renderPurchaseDetails()
         )}
         
         <button
