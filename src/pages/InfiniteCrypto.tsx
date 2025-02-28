@@ -38,7 +38,7 @@ function InfiniteCrypto() {
   const { profile } = useProfile();
   const { currentLanguage } = useLanguage();
   const { gameStats, updateScore, incrementScore } = useGameStats();
-  const { savedElements, saveUserElements, isLoading: elementsLoading } = useUserElements();
+  const { savedElements, saveUserElements, isLoading: elementsLoading, refetchElements } = useUserElements();
   const isDraggingRef = useRef(false);
   const dragStartPositionRef = useRef<{ x: number; y: number } | null>(null);
   const soundEffects = useRef<SoundEffects>();
@@ -50,6 +50,7 @@ function InfiniteCrypto() {
   const [totalGeneratedWords, setTotalGeneratedWords] = useState(0);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialLoadDoneRef = useRef(false);
+  const [elementsLoaded, setElementsLoaded] = useState(false);
 
   const getElementName = (item: DraggableItem) => {
     return item.translations?.[currentLanguage] || item.name;
@@ -69,32 +70,59 @@ function InfiniteCrypto() {
     getValidCombination
   } = useElementCombiner();
 
-  // Load saved elements when user logs in
+  // Load saved elements when user logs in or component mounts
   useEffect(() => {
-    if (!elementsLoading && savedElements.length > 0 && !initialLoadDoneRef.current) {
-      // Merge base elements with saved elements
-      const mergedItems = [...baseElements];
+    const loadSavedElements = async () => {
+      if (elementsLoading) return;
       
-      // Add saved elements that don't already exist
-      savedElements.forEach(savedElement => {
-        const exists = mergedItems.some(item => 
-          item.name === savedElement.name && !item.isBaseElement
-        );
+      if (!elementsLoaded && savedElements.length > 0) {
+        console.log('Loading saved elements:', savedElements.length);
         
-        if (!exists) {
-          // Add to the list with position set to null
-          mergedItems.push({
-            ...savedElement,
-            position: null,
-            connectedPoints: []
-          });
-        }
-      });
-      
-      setItems(mergedItems);
-      initialLoadDoneRef.current = true;
+        // Merge base elements with saved elements
+        const mergedItems = [...baseElements];
+        
+        // Add saved elements that don't already exist
+        savedElements.forEach(savedElement => {
+          const exists = mergedItems.some(item => 
+            item.name === savedElement.name && !item.isBaseElement
+          );
+          
+          if (!exists) {
+            // Add to the list with position set to null
+            mergedItems.push({
+              ...savedElement,
+              position: null,
+              connectedPoints: []
+            });
+          }
+        });
+        
+        setItems(mergedItems);
+        setElementsLoaded(true);
+        initialLoadDoneRef.current = true;
+      } else if (!elementsLoaded && (profile?.id || address)) {
+        // If we have a user but no elements loaded yet, try to refetch
+        console.log('Attempting to refetch elements');
+        await refetchElements();
+      }
+    };
+
+    loadSavedElements();
+  }, [savedElements, elementsLoading, profile, address, elementsLoaded, refetchElements]);
+
+  // Reset elements loaded state when user changes
+  useEffect(() => {
+    if (profile?.id || address) {
+      if (!elementsLoaded && !elementsLoading) {
+        console.log('User authenticated, refetching elements');
+        refetchElements();
+      }
+    } else {
+      // Reset when user logs out
+      setElementsLoaded(false);
+      initialLoadDoneRef.current = false;
     }
-  }, [savedElements, elementsLoading]);
+  }, [profile?.id, address, elementsLoaded, elementsLoading, refetchElements]);
 
   // Save elements when they change
   useEffect(() => {

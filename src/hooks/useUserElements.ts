@@ -16,7 +16,7 @@ export function useUserElements() {
   const isAuthenticated = !!userId || !!address;
 
   // Fetch user's saved elements
-  const { data: savedElements, isLoading, error } = useQuery({
+  const { data: savedElements, isLoading, error, refetch } = useQuery({
     queryKey: ['user-elements', userId],
     queryFn: async () => {
       if (!userId) return [];
@@ -41,8 +41,11 @@ export function useUserElements() {
       }
     },
     enabled: !!userId,
-    retry: 1,
-    staleTime: 60000, // 1 minute
+    retry: 2,
+    staleTime: 30000, // 30 seconds
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchOnReconnect: true,
   });
 
   // Save user elements
@@ -100,6 +103,10 @@ export function useUserElements() {
         }
 
         console.log(`Saved ${elementsToSave.length} elements for user ${userId}`);
+        
+        // Invalidate the query to trigger a refetch
+        queryClient.invalidateQueries({ queryKey: ['user-elements', userId] });
+        
         return elementsToSave;
       } catch (err) {
         console.error('Error in save elements mutation:', err);
@@ -121,6 +128,7 @@ export function useUserElements() {
     isLoading,
     error,
     saveUserElements,
-    isAuthenticated
+    isAuthenticated,
+    refetchElements: refetch
   };
 }
