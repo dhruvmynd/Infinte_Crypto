@@ -10,6 +10,7 @@ import ElementList from '../components/ElementList';
 import { AuthHeader } from '../components/AuthHeader';
 import { CategoryMode } from '../components/CategoryMode';
 import { CheckoutModal } from '../components/CheckoutModal';
+import { WordSelectionModal } from '../components/WordSelectionModal';
 import { FeedbackButton } from '../components/FeedbackButton';
 import { DraggableItem } from '../types';
 import { baseElements, COMBINATION_DISTANCE } from '../constants';
@@ -30,6 +31,7 @@ function InfiniteCrypto() {
     return false;
   });
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isWordSelectionOpen, setIsWordSelectionOpen] = useState(false);
   const [checkoutType, setCheckoutType] = useState<'words' | 'tokens'>('words');
   
   const address = useAddress();
@@ -499,6 +501,10 @@ function InfiniteCrypto() {
     setIsCheckoutOpen(true);
   };
 
+  const handleSelectWords = () => {
+    setIsWordSelectionOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white transition-colors duration-200">
       <div className="w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
@@ -619,7 +625,7 @@ function InfiniteCrypto() {
             score={score}
             totalTargets={totalGeneratedWords}
             onElementClick={handleElementClick}
-            onBuyWords={handleBuyWords}
+            onBuyWords={handleSelectWords}
             onGetTokens={handleGetTokens}
             gameStats={gameStats}
           />
@@ -632,6 +638,12 @@ function InfiniteCrypto() {
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
         type={checkoutType}
+      />
+
+      <WordSelectionModal
+        isOpen={isWordSelectionOpen}
+        onClose={() => setIsWordSelectionOpen(false)}
+        items={items}
       />
     </div>
   );

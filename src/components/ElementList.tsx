@@ -186,7 +186,7 @@ export default function ElementList({
                 ? 'bg-blue-500 text-white'
                 : disabled
                 ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                : 'bg-white dark:bg-gray- 800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
             title={label}
             disabled={disabled}

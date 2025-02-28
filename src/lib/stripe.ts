@@ -64,13 +64,27 @@ export const TOKEN_PACKAGES = [
 // Create a checkout session
 export const createCheckoutSession = async (
   packId: string, 
-  packType: 'words' | 'tokens',
-  userId: string
+  packType: 'words' | 'tokens' | 'custom_words',
+  userId: string,
+  selectedWords?: string[]
 ): Promise<StripeCheckoutSession> => {
   try {
     console.log('Creating checkout session for user:', userId);
     console.log('API URL:', API_URL);
     console.log('Pack type:', packType, 'Pack ID:', packId);
+    
+    // Prepare request body
+    const requestBody: any = {
+      packId,
+      packType,
+      userId,
+    };
+    
+    // Add selected words if provided
+    if (selectedWords && selectedWords.length > 0) {
+      requestBody.selectedWords = selectedWords;
+      requestBody.customPrice = (selectedWords.length * 1.99).toFixed(2);
+    }
     
     // Call the server API to create a checkout session
     const response = await fetch(`${API_URL}/create-checkout-session`, {
@@ -78,11 +92,7 @@ export const createCheckoutSession = async (
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        packId,
-        packType,
-        userId,
-      }),
+      body: JSON.stringify(requestBody),
     });
     
     if (!response.ok) {
@@ -101,10 +111,11 @@ export const createCheckoutSession = async (
         .insert({
           user_id: userId,
           pack_id: packId,
-          amount: getPackageAmount(packId, packType),
-          price: getPackagePrice(packId, packType),
+          amount: selectedWords ? selectedWords.length : getPackageAmount(packId, packType),
+          price: selectedWords ? parseFloat((selectedWords.length * 1.99).toFixed(2)) : getPackagePrice(packId, packType),
           status: 'pending',
-          stripe_session_id: session.id
+          stripe_session_id: session.id,
+          metadata: selectedWords ? { selectedWords } : null
         });
         
       if (error) {
@@ -125,14 +136,27 @@ export const createCheckoutSession = async (
 };
 
 // Helper function to get package amount
-function getPackageAmount(packId: string, packType: 'words' | 'tokens'): number {
+function getPackageAmount(packId: string, packType: 'words' | 'tokens' | 'custom_words'): number {
+  if (packType === 'custom_words') {
+    // Extract the number of words from the custom pack ID (format: custom_X_words)
+    const match = packId.match(/custom_(\d+)_words/);
+    return match ? parseInt(match[1], 10) : 1;
+  }
+  
   const packages = packType === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
   const packageDetails = packages.find(p => p.id === packId);
   return packageDetails?.amount || 0;
 }
 
 // Helper function to get package price
-function getPackagePrice(packId: string, packType: 'words' | 'tokens'): number {
+function getPackagePrice(packId: string, packType: 'words' | 'tokens' | 'custom_words'): number {
+  if (packType === 'custom_words') {
+    // Extract the number of words from the custom pack ID (format: custom_X_words)
+    const match = packId.match(/custom_(\d+)_words/);
+    const wordCount = match ? parseInt(match[1], 10) : 1;
+    return parseFloat((wordCount * 1.99).toFixed(2));
+  }
+  
   const packages = packType === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
   const packageDetails = packages.find(p => p.id === packId);
   return packageDetails?.price || 0;
@@ -159,7 +183,8 @@ export const verifyPurchase = async (sessionId: string): Promise<{
   isCompleted: boolean;
   packId: string;
   amount: number;
-  packType: 'words' | 'tokens';
+  packType: 'words' | 'tokens' | 'custom_words';
+  selectedWords?: string[];
 }> => {
   try {
     console.log('Verifying purchase for session:', sessionId);
@@ -176,18 +201,41 @@ export const verifyPurchase = async (sessionId: string): Promise<{
     const result = await response.json();
     console.log('Purchase verification result:', result);
     
-    // Update the purchase record in the database
+    // Update the purchase record in the database if we have a profile
     try {
-      const { error } = await supabase
+      const { data: purchaseData, error: fetchError } = await supabase
         .from('word_pack_purchases')
-        .update({
-          status: 'completed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('stripe_session_id', sessionId);
+        .select('*')
+        .eq('stripe_session_id', sessionId)
+        .single();
         
-      if (error) {
-        console.error('Error updating purchase record:', error);
+      if (fetchError) {
+        console.error('Error fetching purchase record:', fetchError);
+      } else if (purchaseData) {
+        const { error } = await supabase
+          .from('word_pack_purchases')
+          .update({ 
+            status: 'completed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', purchaseData.id);
+          
+        if (error) {
+          console.error('Error updating purchase record:', error);
+        }
+        
+        // Add tokens to user's balance if this is a token purchase
+        if (result.packType === 'tokens' && purchaseData.user_id) {
+          console.log(`Adding ${result.amount} tokens to user ${purchaseData.user_id}`);
+          
+          // First try direct database update
+          const updateSuccess = await updateUserTokens(purchaseData.user_id, result.amount);
+          
+          // If direct update fails, try using the hook method (though this won't work in this context)
+          if (!updateSuccess) {
+            console.error('Failed to update tokens directly');
+          }
+        }
       }
     } catch (dbError) {
       console.error('Database error:', dbError);
@@ -203,17 +251,31 @@ export const verifyPurchase = async (sessionId: string): Promise<{
                   sessionId.includes('ultimate') ? 'ultimate' : 
                   sessionId.includes('starter') ? 'starter' : 
                   sessionId.includes('plus') ? 'plus' : 
-                  sessionId.includes('premium') ? 'premium' : 'basic';
+                  sessionId.includes('premium') ? 'premium' : 
+                  sessionId.includes('custom') ? sessionId : 'basic';
                   
     const isTokenPack = packId === 'starter' || packId === 'plus' || packId === 'premium';
-    const packType = isTokenPack ? 'tokens' : 'words';
+    const isCustomPack = packId.includes('custom');
     
-    const amount = packId === 'basic' ? 10 : 
-                  packId === 'pro' ? 25 : 
-                  packId === 'ultimate' ? 50 :
-                  packId === 'starter' ? 100 :
-                  packId === 'plus' ? 275 :
-                  packId === 'premium' ? 600 : 10;
+    let packType: 'words' | 'tokens' | 'custom_words' = 'words';
+    if (isTokenPack) {
+      packType = 'tokens';
+    } else if (isCustomPack) {
+      packType = 'custom_words';
+    }
+    
+    let amount = 0;
+    if (isCustomPack) {
+      const match = packId.match(/custom_(\d+)_words/);
+      amount = match ? parseInt(match[1], 10) : 1;
+    } else {
+      amount = packId === 'basic' ? 10 : 
+              packId === 'pro' ? 25 : 
+              packId === 'ultimate' ? 50 :
+              packId === 'starter' ? 100 :
+              packId === 'plus' ? 275 :
+              packId === 'premium' ? 600 : 10;
+    }
     
     // Update the purchase record in the database
     try {
@@ -307,7 +369,7 @@ export const useStripeCheckout = () => {
   const address = useAddress();
   const { addTokens } = useTokens();
   
-  const checkout = async (packId: string, packType: 'words' | 'tokens') => {
+  const checkout = async (packId: string, packType: 'words' | 'tokens' | 'custom_words', selectedWords?: string[]) => {
     if (!profile?.id && !user?.id && !address) {
       throw new Error('User must be logged in to make a purchase');
     }
@@ -321,7 +383,7 @@ export const useStripeCheckout = () => {
     
     try {
       // Create a checkout session
-      const session = await createCheckoutSession(packId, packType, userId);
+      const session = await createCheckoutSession(packId, packType, userId, selectedWords);
       
       // Redirect to Stripe checkout
       await redirectToCheckout(session);

@@ -101,18 +101,63 @@ app.get(['/health', '/api/health'], (req, res) => {
 app.post(['/create-checkout-session', '/api/create-checkout-session'], async (req, res) => {
   try {
     console.log('Received checkout request:', req.body);
-    const { packId, packType, userId } = req.body;
+    const { packId, packType, userId, selectedWords, customPrice } = req.body;
     
     if (!packId || !packType || !userId) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
     
-    // Find the package
-    const packages = packType === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
-    const packageDetails = packages.find(p => p.id === packId);
+    // Find the package or handle custom words
+    let packageDetails;
+    let lineItems = [];
     
-    if (!packageDetails) {
-      return res.status(400).json({ error: `Package ${packId} not found` });
+    if (packType === 'custom_words' && selectedWords && selectedWords.length > 0) {
+      // Handle custom word selection
+      const wordCount = selectedWords.length;
+      const wordPrice = 199; // $1.99 per word in cents
+      
+      packageDetails = {
+        name: `${wordCount} Custom Words`,
+        description: `Purchase ${wordCount} specific words you've selected`,
+        price: wordPrice,
+        amount: wordCount
+      };
+      
+      // Create line items for each selected word
+      lineItems = selectedWords.map(word => ({
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: `Word: ${word}`,
+            description: 'Custom selected word',
+          },
+          unit_amount: wordPrice,
+        },
+        quantity: 1,
+      }));
+    } else {
+      // Standard package
+      const packages = packType === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
+      packageDetails = packages.find(p => p.id === packId);
+      
+      if (!packageDetails) {
+        return res.status(400).json({ error: `Package ${packId} not found` });
+      }
+      
+      // Create a single line item for the package
+      lineItems = [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: packageDetails.name,
+              description: packageDetails.description,
+            },
+            unit_amount: packageDetails.price,
+          },
+          quantity: 1,
+        }
+      ];
     }
     
     // Get the host from the request
@@ -124,19 +169,7 @@ app.post(['/create-checkout-session', '/api/create-checkout-session'], async (re
       // Create a real Stripe checkout session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: packageDetails.name,
-                description: packageDetails.description,
-              },
-              unit_amount: packageDetails.price,
-            },
-            quantity: 1,
-          },
-        ],
+        line_items: lineItems,
         mode: 'payment',
         success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/cancel`,
@@ -144,7 +177,8 @@ app.post(['/create-checkout-session', '/api/create-checkout-session'], async (re
           userId,
           packId,
           packType,
-          amount: packageDetails.amount.toString()
+          amount: packageDetails.amount.toString(),
+          selectedWords: selectedWords ? JSON.stringify(selectedWords) : null
         }
       });
       
@@ -166,7 +200,8 @@ app.post(['/create-checkout-session', '/api/create-checkout-session'], async (re
           userId,
           packId,
           packType,
-          amount: packageDetails.amount.toString()
+          amount: packageDetails.amount.toString(),
+          selectedWords: selectedWords ? JSON.stringify(selectedWords) : null
         }
       };
       
@@ -194,17 +229,25 @@ app.get(['/verify-purchase/:sessionId', '/api/verify-purchase/:sessionId'], asyn
                     sessionId.includes('ultimate') ? 'ultimate' : 
                     sessionId.includes('starter') ? 'starter' : 
                     sessionId.includes('plus') ? 'plus' : 
-                    sessionId.includes('premium') ? 'premium' : 'basic';
+                    sessionId.includes('premium') ? 'premium' : 
+                    sessionId.includes('custom') ? 'custom' : 'basic';
                     
       const isTokenPack = packId === 'starter' || packId === 'plus' || packId === 'premium';
-      const packType = isTokenPack ? 'tokens' : 'words';
+      const isCustomPack = packId.includes('custom');
+      const packType = isTokenPack ? 'tokens' : isCustomPack ? 'custom_words' : 'words';
       
-      const amount = packId === 'basic' ? 10 : 
-                    packId === 'pro' ? 25 : 
-                    packId === 'ultimate' ? 50 :
-                    packId === 'starter' ? 100 :
-                    packId === 'plus' ? 275 :
-                    packId === 'premium' ? 600 : 10;
+      let amount = 0;
+      if (isCustomPack) {
+        const match = packId.match(/custom_(\d+)_words/);
+        amount = match ? parseInt(match[1], 10) : 1;
+      } else {
+        amount = packId === 'basic' ? 10 : 
+                packId === 'pro' ? 25 : 
+                packId === 'ultimate' ? 50 :
+                packId === 'starter' ? 100 :
+                packId === 'plus' ? 275 :
+                packId === 'premium' ? 600 : 10;
+      }
       
       console.log('Simulated purchase verification:', { sessionId, packId, amount, packType });
       
@@ -223,11 +266,22 @@ app.get(['/verify-purchase/:sessionId', '/api/verify-purchase/:sessionId'], asyn
       console.log('Stripe session retrieved:', session);
       
       if (session.payment_status === 'paid') {
+        // Check if this was a custom word selection
+        let selectedWords;
+        if (session.metadata.selectedWords) {
+          try {
+            selectedWords = JSON.parse(session.metadata.selectedWords);
+          } catch (e) {
+            console.error('Error parsing selected words:', e);
+          }
+        }
+        
         return res.json({
           isCompleted: true,
           packId: session.metadata.packId,
           amount: parseInt(session.metadata.amount, 10),
-          packType: session.metadata.packType
+          packType: session.metadata.packType,
+          selectedWords
         });
       } else {
         return res.json({
@@ -246,17 +300,25 @@ app.get(['/verify-purchase/:sessionId', '/api/verify-purchase/:sessionId'], asyn
                     sessionId.includes('ultimate') ? 'ultimate' : 
                     sessionId.includes('starter') ? 'starter' : 
                     sessionId.includes('plus') ? 'plus' : 
-                    sessionId.includes('premium') ? 'premium' : 'basic';
+                    sessionId.includes('premium') ? 'premium' : 
+                    sessionId.includes('custom') ? 'custom' : 'basic';
                     
       const isTokenPack = packId === 'starter' || packId === 'plus' || packId === 'premium';
-      const packType = isTokenPack ? 'tokens' : 'words';
+      const isCustomPack = packId.includes('custom');
+      const packType = isTokenPack ? 'tokens' : isCustomPack ? 'custom_words' : 'words';
       
-      const amount = packId === 'basic' ? 10 : 
-                    packId === 'pro' ? 25 : 
-                    packId === 'ultimate' ? 50 :
-                    packId === 'starter' ? 100 :
-                    packId === 'plus' ? 275 :
-                    packId === 'premium' ? 600 : 10;
+      let amount = 0;
+      if (isCustomPack) {
+        const match = packId.match(/custom_(\d+)_words/);
+        amount = match ? parseInt(match[1], 10) : 1;
+      } else {
+        amount = packId === 'basic' ? 10 : 
+                packId === 'pro' ? 25 : 
+                packId === 'ultimate' ? 50 :
+                packId === 'starter' ? 100 :
+                packId === 'plus' ? 275 :
+                packId === 'premium' ? 600 : 10;
+      }
       
       console.log('Fallback simulated purchase verification:', { sessionId, packId, amount, packType });
       
