@@ -77,7 +77,7 @@ export default function ElementList({
   }
 }: ElementListProps) {
   const [selectedElement, setSelectedElement] = useState<DraggableItem | null>(null);
-  const [showStats, setShowStats] = useState(true);
+  const [showStats, setShowStats] = useState(false);
   const { profile } = useProfile();
   const { user } = useAuth();
   const { calculateRarity } = useRarity();
