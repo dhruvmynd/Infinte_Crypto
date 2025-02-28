@@ -3,6 +3,7 @@ import { useProfile } from '../hooks/useProfile';
 import { useAuth } from '../hooks/useAuth';
 import { useAddress } from "@thirdweb-dev/react";
 import { StripeCheckoutSession } from '../types';
+import { useTokens } from '../hooks/useTokens';
 
 // Stripe public key from environment variables
 const STRIPE_PUBLIC_KEY = import.meta.env.VITE_STRIPE_PUBLIC_KEY || 'pk_test_51Qw9leHFzTpvfWfCsP5HIxNiF8pjgqAykxPQ3Eez3u1lggiASkuTtzcaIJcwtnWhz3DNkHzyb0oUTvM9AKwUL19E00opWZ8V54';
@@ -240,11 +241,53 @@ export const verifyPurchase = async (sessionId: string): Promise<{
   }
 };
 
+// Update user tokens directly in the database
+export const updateUserTokens = async (userId: string, amount: number): Promise<boolean> => {
+  try {
+    console.log(`Directly updating tokens for user ${userId}: +${amount}`);
+    
+    // First get current token balance
+    const { data: profileData, error: fetchError } = await supabase
+      .from('profiles')
+      .select('tokens')
+      .eq('id', userId)
+      .single();
+      
+    if (fetchError) {
+      console.error('Error fetching current token balance:', fetchError);
+      return false;
+    }
+    
+    const currentTokens = profileData?.tokens || 0;
+    const newTokens = currentTokens + amount;
+    
+    console.log(`Current tokens: ${currentTokens}, New tokens: ${newTokens}`);
+    
+    // Update the tokens in the profile
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ tokens: newTokens })
+      .eq('id', userId);
+      
+    if (updateError) {
+      console.error('Error updating tokens:', updateError);
+      return false;
+    }
+    
+    console.log(`Successfully updated tokens for user ${userId}`);
+    return true;
+  } catch (error) {
+    console.error('Error updating user tokens:', error);
+    return false;
+  }
+};
+
 // Hook to handle Stripe checkout
 export const useStripeCheckout = () => {
   const { profile } = useProfile();
   const { user } = useAuth();
   const address = useAddress();
+  const { addTokens } = useTokens();
   
   const checkout = async (packId: string, packType: 'words' | 'tokens') => {
     if (!profile?.id && !user?.id && !address) {

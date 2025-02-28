@@ -4,7 +4,7 @@ import { CheckCircle, ArrowRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
-import { verifyPurchase } from '../lib/stripe';
+import { verifyPurchase, updateUserTokens } from '../lib/stripe';
 import { Toast } from '../components/Toast';
 import { useTokens } from '../hooks/useTokens';
 
@@ -80,7 +80,15 @@ export function SuccessPage() {
                 
                 // Add tokens to user's balance if this is a token purchase
                 if (result.packType === 'tokens') {
-                  addTokens(result.amount);
+                  console.log(`Adding ${result.amount} tokens to user ${profile.id}`);
+                  
+                  // First try direct database update
+                  const updateSuccess = await updateUserTokens(profile.id, result.amount);
+                  
+                  // If direct update fails, try using the hook method
+                  if (!updateSuccess) {
+                    addTokens(result.amount);
+                  }
                 }
               } catch (dbError) {
                 console.error('Database error:', dbError);
@@ -103,7 +111,15 @@ export function SuccessPage() {
           
           // Add tokens to user's balance if this is a token purchase (fallback)
           if (fallbackDetails.packType === 'tokens' && profile?.id) {
-            addTokens(fallbackDetails.amount);
+            console.log(`Adding ${fallbackDetails.amount} tokens to user ${profile.id} (fallback)`);
+            
+            // First try direct database update
+            const updateSuccess = await updateUserTokens(profile.id, fallbackDetails.amount);
+            
+            // If direct update fails, try using the hook method
+            if (!updateSuccess) {
+              addTokens(fallbackDetails.amount);
+            }
           }
           
           setToast({
@@ -125,7 +141,15 @@ export function SuccessPage() {
         
         // Add tokens to user's balance if this is a token purchase (absolute fallback)
         if (fallbackDetails.packType === 'tokens' && profile?.id) {
-          addTokens(fallbackDetails.amount);
+          console.log(`Adding ${fallbackDetails.amount} tokens to user ${profile.id} (absolute fallback)`);
+          
+          // First try direct database update
+          const updateSuccess = await updateUserTokens(profile.id, fallbackDetails.amount);
+          
+          // If direct update fails, try using the hook method
+          if (!updateSuccess) {
+            addTokens(fallbackDetails.amount);
+          }
         }
         
         setToast({
@@ -174,7 +198,7 @@ export function SuccessPage() {
               Thank you for your purchase. Your account has been credited with:
             </p>
             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
-              <p className="text-xl font-bold">{purchaseDetails.amount} {purchaseDetails.pack_id.includes('token') || purchaseDetails.packType === 'tokens' ? 'Tokens' : 'Words'}</p>
+              <p className="text-xl font-bold">{purchaseDetails.amount} {purchaseDetails.packType === 'tokens' ? 'Tokens' : 'Words'}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">Pack: {purchaseDetails.pack_id}</p>
             </div>
           </div>
