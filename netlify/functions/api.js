@@ -209,6 +209,44 @@ app.post(['/process-payment', '/api/process-payment'], async (req, res) => {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
     
+    // For development/testing, simulate success
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Development mode: Simulating payment success');
+      
+      // Create a simulated purchase record
+      try {
+        const { error } = await stripe.customers.create({
+          email: email,
+          payment_method: paymentMethodId,
+          invoice_settings: {
+            default_payment_method: paymentMethodId,
+          },
+          metadata: {
+            userId,
+            packId,
+            packType,
+            selectedWords: selectedWords ? JSON.stringify(selectedWords) : null
+          }
+        });
+        
+        if (error) {
+          console.error('Error creating customer:', error);
+        }
+      } catch (err) {
+        console.error('Error in customer creation:', err);
+        // Continue with simulation even if customer creation fails
+      }
+      
+      return res.json({ 
+        success: true, 
+        simulated: true,
+        paymentIntent: { 
+          id: `sim_${Date.now()}`,
+          status: 'succeeded'
+        }
+      });
+    }
+    
     try {
       // Create a payment intent
       const paymentIntent = await stripe.paymentIntents.create({
@@ -254,21 +292,7 @@ app.post(['/process-payment', '/api/process-payment'], async (req, res) => {
       
       // Provide detailed error message
       const errorMessage = stripeError.raw?.message || stripeError.message || 'Payment processing failed';
-      
-      // For development/testing, simulate success
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('Development mode: Simulating payment success');
-        res.json({ 
-          success: true, 
-          simulated: true,
-          paymentIntent: { 
-            id: `sim_${Date.now()}`,
-            status: 'succeeded'
-          }
-        });
-      } else {
-        res.status(400).json({ error: errorMessage });
-      }
+      res.status(400).json({ error: errorMessage });
     }
   } catch (error) {
     console.error('Error processing payment:', error);

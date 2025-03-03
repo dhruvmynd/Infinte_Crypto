@@ -205,7 +205,10 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
       }
       
       // Pass the payment method ID to your server
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/process-payment`, {
+      const apiUrl = `${import.meta.env.VITE_API_URL || ''}/api/process-payment`;
+      console.log('Sending payment to:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -221,12 +224,51 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
         }),
       });
       
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server error response:', errorText);
+        throw new Error(errorText || 'Server error');
+      }
+      
       const result = await response.json();
       
       if (result.error) {
         setPaymentError(result.error);
         setProcessing(false);
         return;
+      }
+      
+      if (result.requires_action) {
+        // Handle 3D Secure authentication if needed
+        const { error: actionError } = await stripeRef.current.handleCardAction(
+          result.payment_intent_client_secret
+        );
+        
+        if (actionError) {
+          setPaymentError(actionError.message);
+          setProcessing(false);
+          return;
+        }
+        
+        // Confirm the payment after 3D Secure authentication
+        const confirmResponse = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            paymentIntentId: result.payment_intent_id,
+            userId: profile.id,
+          }),
+        });
+        
+        const confirmResult = await confirmResponse.json();
+        
+        if (confirmResult.error) {
+          setPaymentError(confirmResult.error);
+          setProcessing(false);
+          return;
+        }
       }
       
       // Show success message
