@@ -93,7 +93,8 @@ export function StripeCheckoutForm({ isOpen, onClose, selectedWords, onSuccess, 
           packId,
           packType,
           userId: profile.id,
-          selectedWords: isTokenPurchase ? undefined : selectedWords
+          selectedWords: isTokenPurchase ? undefined : selectedWords,
+          directPayment: true // Flag to indicate this is a direct payment
         }),
       });
       
@@ -304,6 +305,10 @@ export function StripeCheckoutForm({ isOpen, onClose, selectedWords, onSuccess, 
                     required
                     disabled={loading}
                   />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex space-x-1">
+                    <img src="https://cdn.jsdelivr.net/gh/creativetimofficial/public-assets@master/soft-ui-dashboard-pro/assets/img/logos/visa.png" alt="visa" className="h-4" />
+                    <img src="https://cdn.jsdelivr.net/gh/creativetimofficial/public-assets@master/soft-ui-dashboard-pro/assets/img/logos/mastercard.png" alt="mastercard" className="h-4" />
+                  </div>
                 </div>
               </div>
               

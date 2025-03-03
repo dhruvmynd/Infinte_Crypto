@@ -76,7 +76,7 @@ app.get(['/health', '/api/health'], (req, res) => {
 app.post(['/create-checkout-session', '/api/create-checkout-session'], async (req, res) => {
   try {
     console.log('Received checkout request:', req.body);
-    const { packId, packType, userId, selectedWords, customPrice } = req.body;
+    const { packId, packType, userId, selectedWords, customPrice, directPayment } = req.body;
     
     if (!packId || !packType || !userId) {
       return res.status(400).json({ error: 'Missing required parameters' });
@@ -140,6 +140,36 @@ app.post(['/create-checkout-session', '/api/create-checkout-session'], async (re
     const protocol = host.includes('localhost') ? 'http' : 'https';
     const origin = `${protocol}://${host}`;
     
+    // If this is a direct payment (in-page checkout), return a simulated session
+    if (directPayment) {
+      console.log('Processing direct payment request');
+      
+      const sessionId = `sim_direct_${Date.now()}_${packId}`;
+      
+      const session = {
+        id: sessionId,
+        url: null, // No URL needed for direct payment
+        payment_status: 'paid',
+        metadata: {
+          userId,
+          packId,
+          packType,
+          amount: packageDetails.amount.toString(),
+          selectedWords: selectedWords ? JSON.stringify(selectedWords) : null,
+          directPayment: 'true'
+        }
+      };
+      
+      console.log('Created direct payment session:', session);
+      
+      return res.json({ 
+        id: session.id, 
+        url: null,
+        directPayment: true,
+        success: true
+      });
+    }
+    
     try {
       // Create a real Stripe checkout session
       const session = await stripe.checkout.sessions.create({
@@ -195,6 +225,41 @@ app.get(['/verify-purchase/:sessionId', '/api/verify-purchase/:sessionId'], asyn
   try {
     console.log('Verifying purchase:', req.params);
     const { sessionId } = req.params;
+    
+    // Check if this is a direct payment session
+    if (sessionId.startsWith('sim_direct_')) {
+      console.log('Verifying direct payment session');
+      
+      // Extract info from the session ID
+      const packId = sessionId.includes('starter') ? 'starter' : 
+                    sessionId.includes('plus') ? 'plus' : 
+                    sessionId.includes('premium') ? 'premium' : 
+                    sessionId.includes('custom') ? 'custom' : 'basic';
+                    
+      const isTokenPack = packId === 'starter' || packId === 'plus' || packId === 'premium';
+      const isCustomPack = packId.includes('custom');
+      const packType = isTokenPack ? 'tokens' : isCustomPack ? 'custom_words' : 'custom_words';
+      
+      let amount = 0;
+      if (isCustomPack) {
+        const match = packId.match(/custom_(\d+)_words/);
+        amount = match ? parseInt(match[1], 10) : 1;
+      } else {
+        amount = packId === 'starter' ? 100 :
+                packId === 'plus' ? 275 :
+                packId === 'premium' ? 600 : 1;
+      }
+      
+      console.log('Direct payment verification:', { sessionId, packId, amount, packType });
+      
+      return res.json({
+        isCompleted: true,
+        packId,
+        amount,
+        packType,
+        directPayment: true
+      });
+    }
     
     // Check if this is a simulated session
     if (sessionId.startsWith('sim_')) {

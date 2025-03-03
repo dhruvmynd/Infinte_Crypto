@@ -113,159 +113,62 @@ app.get('/api/health', (req, res) => {
 app.post(['/api/create-checkout-session', '/create-checkout-session'], async (req, res) => {
   try {
     console.log('Received checkout request:', req.body);
-    const { packId, packType, userId } = req.body;
+    const { packId, packType, userId, selectedWords, directPayment } = req.body;
     
     if (!packId || !packType || !userId) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
     
     // Find the package
-    const packages = packType === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
-    const packageDetails = packages.find(p => p.id === packId);
+    let packageDetails;
     
-    if (!packageDetails) {
-      return res.status(400).json({ error: `Package ${packId} not found` });
-    }
-    
-    // In production, we would use Stripe here
-    // For now, we'll simulate the Stripe session
-    const sessionId = `sim_${Date.now()}_${packId}`;
-    
-    // Get the host from the request
-    const host = req.headers.host || 'infinite-ideas.ai';
-    const protocol = host.includes('localhost') ? 'http' : 'https';
-    
-    // Create a simulated session response
-    const session = {
-      id: sessionId,
-      url: `${protocol}://${host}/success?session_id=${sessionId}&pack_id=${packId}&amount=${packageDetails.amount}`,
-      payment_status: 'paid',
-      metadata: {
-        userId,
-        packId,
-        packType,
-        amount: packageDetails.amount.toString()
+    if (packType === 'custom_words' && selectedWords && selectedWords.length > 0) {
+      // Handle custom word selection
+      const wordCount = selectedWords.length;
+      const wordPrice = 199; // $1.99 per word in cents
+      
+      packageDetails = {
+        name: `${wordCount} Custom Words`,
+        description: `Purchase ${wordCount} specific words you've selected`,
+        price: wordPrice * wordCount,
+        amount: wordCount
+      };
+    } else {
+      // Standard package
+      const packages = packType === 'words' ? WORD_PACKS : TOKEN_PACKAGES;
+      packageDetails = packages.find(p => p.id === packId);
+      
+      if (!packageDetails) {
+        return res.status(400).json({ error: `Package ${packId} not found` });
       }
-    };
+    }
     
-    console.log('Created simulated checkout session:', session);
-    
-    res.json({ id: session.id, url: session.url });
-  } catch (error) {
-    console.error('Error creating checkout session:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Verify a purchase - handle both /api/verify-purchase/:sessionId and /verify-purchase/:sessionId
-app.get(['/api/verify-purchase/:sessionId', '/verify-purchase/:sessionId'], async (req, res) => {
-  try {
-    console.log('Verifying purchase:', req.params);
-    const { sessionId } = req.params;
-    
-    // For now, we'll simulate a successful purchase
-    const packId = sessionId.includes('basic') ? 'basic' : 
-                  sessionId.includes('pro') ? 'pro' : 
-                  sessionId.includes('ultimate') ? 'ultimate' : 
-                  sessionId.includes('starter') ? 'starter' : 
-                  sessionId.includes('plus') ? 'plus' : 
-                  sessionId.includes('premium') ? 'premium' : 'basic';
-                  
-    const isTokenPack = packId === 'starter' || packId === 'plus' || packId === 'premium';
-    const packType = isTokenPack ? 'tokens' : 'words';
-    
-    const amount = packId === 'basic' ? 10 : 
-                  packId === 'pro' ? 25 : 
-                  packId === 'ultimate' ? 50 :
-                  packId === 'starter' ? 100 :
-                  packId === 'plus' ? 275 :
-                  packId === 'premium' ? 600 : 10;
-    
-    console.log('Simulated purchase verification:', { sessionId, packId, amount, packType });
-    
-    res.json({
-      isCompleted: true,
-      packId,
-      amount,
-      packType
-    });
-  } catch (error) {
-    console.error('Error verifying purchase:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Webhook to handle Stripe events
-app.post(['/api/webhook', '/webhook'], (req, res) => {
-  console.log('Received webhook event');
-  res.json({ received: true });
-});
-
-// Function to check if a port is available
-async function isPortAvailable(port) {
-  return new Promise((resolve) => {
-    const server = createServer();
-    server.once('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        resolve(false);
-      } else {
-        resolve(true);
+    // If this is a direct payment (in-page checkout), return a simulated session
+    if (directPayment) {
+      console.log('Processing direct payment request');
+      
+      const sessionId = `sim_direct_${Date.now()}_${packId}`;
+      
+      const session = {
+        id: sessionId,
+        url: null, // No URL needed for direct payment
+        payment_status: 'paid',
+        metadata: {
+          userId,
+          packId,
+          packType,
+          amount: packageDetails.amount.toString(),
+          selectedWords: selectedWords ? JSON.stringify(selectedWords) : null,
+          directPayment: 'true'
+        }
+      };
+      
+      console.log('Created direct payment session:', session);
+      
+      return res.json({
       }
-    });
-    
-    server.once('listening', () => {
-      server.close();
-      resolve(true);
-    });
-    
-    server.listen(port, '0.0.0.0');
-  });
-}
-
-// Function to find an available port
-async function findAvailablePort(startPort) {
-  let currentPort = startPort;
-  const MAX_PORT = startPort + 10; // Try up to 10 ports
-  
-  while (currentPort < MAX_PORT) {
-    if (await isPortAvailable(currentPort)) {
-      return currentPort;
+      )
     }
-    currentPort++;
-  }
-  
-  throw new Error(`Could not find an available port between ${startPort} and ${MAX_PORT-1}`);
-}
-
-// Start the server with port checking
-async function startServer() {
-  try {
-    // Check if the default port is available, otherwise find another one
-    if (!(await isPortAvailable(port))) {
-      console.log(`Port ${port} is already in use, looking for an available port...`);
-      port = await findAvailablePort(port + 1);
-    }
-    
-    const server = app.listen(port, '0.0.0.0', () => {
-      console.log(`Server running on http://localhost:${port}`);
-      console.log(`API server initialized in simulation mode`);
-    });
-    
-    // Handle graceful shutdown
-    process.on('SIGINT', () => {
-      console.log('Shutting down server...');
-      server.close(() => {
-        console.log('Server shut down successfully');
-        process.exit(0);
-      });
-    });
-    
-    return server;
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
   }
 }
-
-// Start the server
-startServer();
+)
