@@ -250,7 +250,7 @@ app.post(['/process-payment', '/api/process-payment'], async (req, res) => {
     try {
       // Create a payment intent
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount), // Ensure it's an integer
+        amount: Math.round(amount * 100), // Convert to cents and ensure it's an integer
         currency: 'usd',
         payment_method: paymentMethodId,
         confirm: true,

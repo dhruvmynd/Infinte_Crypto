@@ -204,8 +204,13 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
         return;
       }
       
-      // Pass the payment method ID to your server
-      const apiUrl = `${import.meta.env.VITE_API_URL || ''}/api/process-payment`;
+      // Get the API URL from environment variables, ensuring we don't duplicate the /api prefix
+      const baseApiUrl = import.meta.env.VITE_API_URL || '';
+      // Construct the endpoint URL, avoiding double /api/ prefix
+      const apiUrl = baseApiUrl.endsWith('/api') || baseApiUrl.includes('/api/') 
+        ? `${baseApiUrl}/process-payment` 
+        : `${baseApiUrl}/api/process-payment`;
+      
       console.log('Sending payment to:', apiUrl);
       
       const response = await fetch(apiUrl, {
