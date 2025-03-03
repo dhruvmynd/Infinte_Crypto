@@ -27,6 +27,8 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
   const [processing, setProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [country, setCountry] = useState('US');
   
   const { profile } = useProfile();
   const { checkout } = useStripeCheckout();
@@ -49,6 +51,8 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
       setProcessing(false);
       setPaymentError(null);
       setEmail('');
+      setPostalCode('');
+      setCountry('US');
       
       // Initialize Stripe if it's not already initialized
       if (!stripeRef.current && window.Stripe) {
@@ -75,7 +79,7 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
       // Create Elements instance
       stripeElementsRef.current = stripeRef.current.elements();
       
-      // Create Card element
+      // Create Card element with hidePostalCode option
       stripeCardRef.current = stripeElementsRef.current.create('card', {
         style: {
           base: {
@@ -91,6 +95,7 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
             iconColor: '#fa755a',
           },
         },
+        hidePostalCode: true, // Hide the built-in postal code field
       });
       
       // Mount Card element
@@ -167,6 +172,11 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
       setPaymentError('Please enter your email address');
       return;
     }
+
+    if (!postalCode) {
+      setPaymentError('Please enter your postal code');
+      return;
+    }
     
     setProcessing(true);
     setPaymentError(null);
@@ -175,12 +185,16 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
       // Create a custom pack ID based on the number of words
       const customPackId = `custom_${selectedWords.length}_words`;
       
-      // Create a payment method
+      // Create a payment method with billing details including postal code
       const { paymentMethod, error } = await stripeRef.current.createPaymentMethod({
         type: 'card',
         card: stripeCardRef.current,
         billing_details: {
           email: email,
+          address: {
+            postal_code: postalCode,
+            country: country
+          }
         },
       });
       
@@ -409,12 +423,52 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
                 ref={cardElementRef}
                 className="w-full px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm dark:bg-gray-700"
               />
-              {paymentError && (
-                <div className="mt-2 text-sm text-red-600 dark:text-red-400">
-                  {paymentError}
-                </div>
-              )}
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="country" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Country
+                </label>
+                <select
+                  id="country"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="US">United States</option>
+                  <option value="CA">Canada</option>
+                  <option value="GB">United Kingdom</option>
+                  <option value="AU">Australia</option>
+                  <option value="DE">Germany</option>
+                  <option value="FR">France</option>
+                  <option value="JP">Japan</option>
+                  <option value="IN">India</option>
+                  <option value="BR">Brazil</option>
+                  <option value="MX">Mexico</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="postal-code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Postal Code
+                </label>
+                <input
+                  id="postal-code"
+                  type="text"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  placeholder="12345"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+            </div>
+            
+            {paymentError && (
+              <div className="mt-2 text-sm text-red-600 dark:text-red-400">
+                {paymentError}
+              </div>
+            )}
           </div>
 
           <div className="mt-6 flex items-center justify-between">
@@ -428,7 +482,7 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
             </button>
             <button
               type="submit"
-              disabled={!cardComplete || processing || !email}
+              disabled={!cardComplete || processing || !email || !postalCode}
               className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {processing ? (
