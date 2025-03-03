@@ -45,6 +45,8 @@ declare global {
   interface Window {
     Stripe?: (apiKey: string) => {
       redirectToCheckout: (options: { sessionId: string }) => Promise<{ error?: { message: string } }>;
+      elements: () => any;
+      createPaymentMethod: (options: any) => Promise<any>;
     };
   }
 }

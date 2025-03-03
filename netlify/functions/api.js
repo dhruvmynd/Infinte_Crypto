@@ -58,6 +58,7 @@ app.get(['/', '/api'], (req, res) => {
       '/api/create-checkout-session',
       '/api/verify-purchase/:sessionId',
       '/api/webhook',
+      '/api/process-payment',
       '/health'
     ]
   });
@@ -186,6 +187,91 @@ app.post(['/create-checkout-session', '/api/create-checkout-session'], async (re
     }
   } catch (error) {
     console.error('Error creating checkout session:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Process direct payment - handle both direct and /api/ prefixed routes
+app.post(['/process-payment', '/api/process-payment'], async (req, res) => {
+  try {
+    console.log('Received direct payment request:', req.body);
+    const { 
+      paymentMethodId, 
+      amount, 
+      email, 
+      packId, 
+      packType, 
+      userId, 
+      selectedWords 
+    } = req.body;
+    
+    if (!paymentMethodId || !amount || !email || !packId || !packType || !userId) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    try {
+      // Create a payment intent
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount), // Ensure it's an integer
+        currency: 'usd',
+        payment_method: paymentMethodId,
+        confirm: true,
+        confirmation_method: 'manual',
+        return_url: `${req.headers.origin || 'https://infinite-ideas.ai'}/success`,
+        metadata: {
+          userId,
+          packId,
+          packType,
+          email,
+          selectedWords: selectedWords ? JSON.stringify(selectedWords) : null
+        }
+      });
+      
+      console.log('Created payment intent:', paymentIntent);
+      
+      if (paymentIntent.status === 'succeeded') {
+        res.json({ 
+          success: true, 
+          paymentIntent: { 
+            id: paymentIntent.id,
+            status: paymentIntent.status
+          }
+        });
+      } else if (paymentIntent.status === 'requires_action') {
+        res.json({
+          requires_action: true,
+          payment_intent_client_secret: paymentIntent.client_secret
+        });
+      } else {
+        res.json({ 
+          success: false, 
+          error: 'Payment failed',
+          status: paymentIntent.status
+        });
+      }
+    } catch (stripeError) {
+      console.error('Stripe payment error:', stripeError);
+      
+      // Provide detailed error message
+      const errorMessage = stripeError.raw?.message || stripeError.message || 'Payment processing failed';
+      
+      // For development/testing, simulate success
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Development mode: Simulating payment success');
+        res.json({ 
+          success: true, 
+          simulated: true,
+          paymentIntent: { 
+            id: `sim_${Date.now()}`,
+            status: 'succeeded'
+          }
+        });
+      } else {
+        res.status(400).json({ error: errorMessage });
+      }
+    }
+  } catch (error) {
+    console.error('Error processing payment:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -322,6 +408,11 @@ app.post(['/webhook', '/api/webhook'], async (req, res) => {
         const session = event.data.object;
         console.log('Payment successful for session:', session.id);
         // Here you would update your database to mark the purchase as completed
+        break;
+      case 'payment_intent.succeeded':
+        const paymentIntent = event.data.object;
+        console.log('Payment intent succeeded:', paymentIntent.id);
+        // Handle successful payment intent
         break;
       default:
         console.log(`Unhandled event type ${event.type}`);

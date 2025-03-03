@@ -109,7 +109,7 @@ export function ThirdWebAuth() {
     <div className="relative flex flex-col items-center">
       <ConnectWallet
         theme="dark"
-        btnTitle="Connect with Web3"
+        btnTitle="Connect Wallet"
         modalTitle="Connect Your Wallet"
         modalTitleIconUrl=""
         modalSize="wide"
@@ -124,7 +124,7 @@ export function ThirdWebAuth() {
         }}
         detailsBtn={() => (
           <button className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-colors">
-            <Wallet size={20} />
+            <Wallet size={18} />
             <span className="truncate">{address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Connect Wallet'}</span>
           </button>
         )}
