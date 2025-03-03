@@ -220,7 +220,7 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
         },
         body: JSON.stringify({
           paymentMethodId: paymentMethod.id,
-          amount: parseFloat(totalPrice) * 100, // Convert to cents
+          amount: parseFloat(totalPrice),
           email: email,
           packId: customPackId,
           packType: 'custom_words',
