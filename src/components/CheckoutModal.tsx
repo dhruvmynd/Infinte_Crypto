@@ -6,7 +6,6 @@ import { useAuth } from '../hooks/useAuth';
 import { useAddress } from "@thirdweb-dev/react";
 import { useProfile } from '../hooks/useProfile';
 import { checkSupabaseConnection, handleDatabaseError } from '../lib/supabase';
-import { StripeCheckoutModal } from './StripeCheckoutModal';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -18,14 +17,6 @@ export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
-  const [showStripeModal, setShowStripeModal] = useState(false);
-  const [selectedPackDetails, setSelectedPackDetails] = useState<{
-    id: string;
-    amount: number;
-    price: number;
-    title: string;
-  } | null>(null);
-  
   const { checkout } = useStripeCheckout();
   const { user } = useAuth();
   const address = useAddress();
@@ -36,8 +27,6 @@ export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
     if (isOpen) {
       setSelectedPackage(null);
       setError(null);
-      setShowStripeModal(false);
-      setSelectedPackDetails(null);
     }
   }, [isOpen]);
   
@@ -77,23 +66,7 @@ export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
         throw new Error(connectionError?.message || 'Database connection issue. Please try again.');
       }
       
-      // Find the package details
-      const packageDetails = packages.find(p => p.id === packageId);
-      if (!packageDetails) {
-        throw new Error(`Package ${packageId} not found`);
-      }
-      
-      // Set the selected package details for the Stripe modal
-      setSelectedPackDetails({
-        id: packageId,
-        amount: packageDetails.amount,
-        price: packageDetails.price,
-        title: `${packageDetails.name} - ${packageDetails.description}`
-      });
-      
-      // Show the Stripe checkout modal
-      setShowStripeModal(true);
-      
+      await checkout(packageId, 'tokens');
     } catch (err) {
       const errorMessage = err instanceof Error 
         ? handleDatabaseError(err, err.message)
@@ -107,105 +80,87 @@ export function CheckoutModal({ isOpen, onClose, type }: CheckoutModalProps) {
   };
 
   return (
-    <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg relative">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            disabled={loading}
-          >
-            <X size={20} />
-          </button>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          disabled={loading}
+        >
+          <X size={20} />
+        </button>
 
-          <h2 className="text-2xl font-bold mb-6">
-            Get Tokens
-          </h2>
+        <h2 className="text-2xl font-bold mb-6">
+          Get Tokens
+        </h2>
 
-          {!isLoggedIn && (
-            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
-              <AlertCircle size={20} className="text-red-500 dark:text-red-400 shrink-0" />
-              <p className="text-sm text-red-600 dark:text-red-400">User must be logged in to make a purchase</p>
-            </div>
-          )}
+        {!isLoggedIn && (
+          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
+            <AlertCircle size={20} className="text-red-500 dark:text-red-400 shrink-0" />
+            <p className="text-sm text-red-600 dark:text-red-400">User must be logged in to make a purchase</p>
+          </div>
+        )}
 
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
-              <AlertCircle size={20} className="text-red-500 dark:text-red-400 shrink-0" />
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-            </div>
-          )}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
+            <AlertCircle size={20} className="text-red-500 dark:text-red-400 shrink-0" />
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          </div>
+        )}
 
-          <div className="space-y-4">
-            {packages.map((pkg) => (
-              <div
-                key={pkg.id}
-                className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-purple-100 dark:bg-purple-900/30 text-purple-500">
-                    {React.createElement(icon, { size: 24 })}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold">{pkg.name}</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">{pkg.description}</p>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-lg font-bold">${pkg.price.toFixed(2)}</span>
-                      <button
-                        onClick={() => handleCheckout(pkg.id)}
-                        disabled={loading || !isLoggedIn}
-                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {loading && selectedPackage === pkg.id ? (
-                          <Loader2 size={16} className="animate-spin" />
-                        ) : (
-                          <CreditCard size={16} />
-                        )}
-                        <span>{loading && selectedPackage === pkg.id ? 'Processing...' : 'Buy Now'}</span>
-                      </button>
-                    </div>
+        <div className="space-y-4">
+          {packages.map((pkg) => (
+            <div
+              key={pkg.id}
+              className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-purple-100 dark:bg-purple-900/30 text-purple-500">
+                  {React.createElement(icon, { size: 24 })}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold">{pkg.name}</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">{pkg.description}</p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-lg font-bold">${pkg.price}</span>
+                    <button
+                      onClick={() => handleCheckout(pkg.id)}
+                      disabled={loading || !isLoggedIn}
+                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading && selectedPackage === pkg.id ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <CreditCard size={16} />
+                      )}
+                      <span>{loading && selectedPackage === pkg.id ? 'Processing...' : 'Buy Now'}</span>
+                    </button>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-
-          <div className="mt-6 flex items-center justify-center gap-2">
-            <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-              <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 12H20M20 12L16 8M20 12L16 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Secure payment powered by Stripe
-            </p>
-          </div>
+          ))}
         </div>
 
-        {loading && (
-          <Toast
-            message="Processing your purchase..."
-            type="loading"
-            onClose={() => {}}
-          />
-        )}
+        <div className="mt-6 flex items-center justify-center gap-2">
+          <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 12H20M20 12L16 8M20 12L16 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Secure payment powered by Stripe
+          </p>
+        </div>
       </div>
-      
-      {/* Stripe Checkout Modal */}
-      {showStripeModal && selectedPackDetails && (
-        <StripeCheckoutModal
-          isOpen={showStripeModal}
-          onClose={() => {
-            setShowStripeModal(false);
-            onClose();
-          }}
-          packId={selectedPackDetails.id}
-          packType="tokens"
-          amount={selectedPackDetails.amount}
-          price={selectedPackDetails.price}
-          title={selectedPackDetails.title}
+
+      {loading && (
+        <Toast
+          message="Processing your purchase..."
+          type="loading"
+          onClose={() => {}}
         />
       )}
-    </>
+    </div>
   );
 }
