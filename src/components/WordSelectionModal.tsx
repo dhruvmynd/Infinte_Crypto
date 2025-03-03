@@ -4,6 +4,7 @@ import { useStripeCheckout } from '../lib/stripe';
 import { useProfile } from '../hooks/useProfile';
 import { DraggableItem } from '../types';
 import { Toast } from './Toast';
+import { StripeCheckoutForm } from './StripeCheckoutForm';
 
 interface WordSelectionModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
   const [selectedWords, setSelectedWords] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'loading' } | null>(null);
+  const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const { profile } = useProfile();
   const { checkout } = useStripeCheckout();
 
@@ -25,6 +27,7 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
   useEffect(() => {
     if (isOpen) {
       setSelectedWords([]);
+      setShowCheckoutForm(false);
     }
   }, [isOpen]);
 
@@ -41,6 +44,29 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
   const totalPrice = (selectedWords.length * 1.99).toFixed(2);
 
   const handleCheckout = async () => {
+    if (selectedWords.length === 0) {
+      setToast({
+        message: 'Please select at least one word to purchase',
+        type: 'error'
+      });
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
+
+    if (!profile?.id) {
+      setToast({
+        message: 'You must be logged in to make a purchase',
+        type: 'error'
+      });
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
+
+    // Show the in-page checkout form instead of redirecting
+    setShowCheckoutForm(true);
+  };
+
+  const handleExternalCheckout = async () => {
     if (selectedWords.length === 0) {
       setToast({
         message: 'Please select at least one word to purchase',
@@ -84,110 +110,144 @@ export function WordSelectionModal({ isOpen, onClose, items }: WordSelectionModa
     }
   };
 
+  const handleCheckoutSuccess = () => {
+    // Handle successful checkout
+    setToast({
+      message: 'Purchase completed successfully!',
+      type: 'success'
+    });
+    
+    // Close the modal after a delay
+    setTimeout(() => {
+      onClose();
+    }, 2000);
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl relative max-h-[80vh] flex flex-col">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            Select Words to Purchase
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            disabled={loading}
-          >
-            <X size={20} />
-          </button>
-        </div>
-        
-        <div className="p-6 overflow-y-auto flex-1">
-          {generatedElements.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500 dark:text-gray-400">
-                You haven't generated any words yet. Combine elements to create words that you can purchase.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {generatedElements.map((element) => (
-                <div
-                  key={element.id}
-                  onClick={() => !loading && toggleWordSelection(element.name)}
-                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                    selectedWords.includes(element.name)
-                      ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-500 dark:border-purple-400'
-                      : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">
-                      {typeof element.icon === 'string' ? element.icon : '💫'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{element.name}</p>
-                      {element.rarity && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Rarity: {element.rarity}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex-shrink-0">
-                      {selectedWords.includes(element.name) ? (
-                        <div className="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center">
-                          <Check size={14} className="text-white" />
-                        </div>
-                      ) : (
-                        <div className="w-6 h-6 border border-gray-300 dark:border-gray-500 rounded-full"></div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        
-        <div className="p-6 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Selected: <span className="font-bold">{selectedWords.length}</span> words
-              </p>
-              <p className="text-lg font-bold">
-                Total: <span className="text-green-600 dark:text-green-400">${totalPrice}</span>
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                $1.99 per word
-              </p>
-            </div>
+    <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl relative max-h-[80vh] flex flex-col">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              Select Words to Purchase
+            </h2>
             <button
-              onClick={handleCheckout}
-              disabled={loading || selectedWords.length === 0}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              disabled={loading}
             >
-              {loading ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  <span>Processing...</span>
-                </>
-              ) : (
-                <>
-                  <ShoppingCart size={18} />
-                  <span>Checkout</span>
-                </>
-              )}
+              <X size={20} />
             </button>
           </div>
+          
+          <div className="p-6 overflow-y-auto flex-1">
+            {generatedElements.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500 dark:text-gray-400">
+                  You haven't generated any words yet. Combine elements to create words that you can purchase.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {generatedElements.map((element) => (
+                  <div
+                    key={element.id}
+                    onClick={() => !loading && toggleWordSelection(element.name)}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedWords.includes(element.name)
+                        ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-500 dark:border-purple-400'
+                        : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">
+                        {typeof element.icon === 'string' ? element.icon : '💫'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{element.name}</p>
+                        {element.rarity && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Rarity: {element.rarity}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex-shrink-0">
+                        {selectedWords.includes(element.name) ? (
+                          <div className="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center">
+                            <Check size={14} className="text-white" />
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6 border border-gray-300 dark:border-gray-500 rounded-full"></div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <div className="p-6 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Selected: <span className="font-bold">{selectedWords.length}</span> words
+                </p>
+                <p className="text-lg font-bold">
+                  Total: <span className="text-green-600 dark:text-green-400">${totalPrice}</span>
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  $1.99 per word
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleExternalCheckout}
+                  disabled={loading || selectedWords.length === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ShoppingCart size={18} />
+                  <span>Stripe Checkout</span>
+                </button>
+                <button
+                  onClick={handleCheckout}
+                  disabled={loading || selectedWords.length === 0}
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart size={18} />
+                      <span>Checkout</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
+        
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
       </div>
-      
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
+
+      {showCheckoutForm && (
+        <StripeCheckoutForm 
+          isOpen={showCheckoutForm}
+          onClose={() => setShowCheckoutForm(false)}
+          selectedWords={selectedWords}
+          onSuccess={handleCheckoutSuccess}
         />
       )}
-    </div>
+    </>
   );
 }
